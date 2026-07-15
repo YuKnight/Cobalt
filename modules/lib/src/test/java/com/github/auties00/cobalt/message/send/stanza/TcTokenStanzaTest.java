@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.privacy.LiveTrustedContactTokenService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import org.junit.jupiter.api.DisplayName;

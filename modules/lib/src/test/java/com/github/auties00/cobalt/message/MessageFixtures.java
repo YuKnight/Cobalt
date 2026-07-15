@@ -5,10 +5,10 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentityBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentityBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 

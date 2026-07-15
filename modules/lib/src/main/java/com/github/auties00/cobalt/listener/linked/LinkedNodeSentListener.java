@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.listener.linked;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * A functional interface for the {@link LinkedWhatsAppClientListener#onNodeSent onNodeSent} event.

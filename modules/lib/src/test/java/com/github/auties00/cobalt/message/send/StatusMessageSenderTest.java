@@ -7,16 +7,16 @@ import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.contact.ContactBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.privacy.StatusPrivacyMode;
-import com.github.auties00.cobalt.model.privacy.StatusPrivacySettingBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.contact.ContactBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.privacy.StatusPrivacyMode;
+import com.github.auties00.cobalt.wire.linked.privacy.StatusPrivacySettingBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
@@ -66,7 +66,7 @@ class StatusMessageSenderTest {
                 StubDeviceService.create().withStatusFanout(
                         audience -> Set.of(AUDIENCE_DEVICE)));
 
-        sender.send(STATUS, statusMessage("3EB0STAT001", MessageContainer.of("status body")));
+        sender.send(STATUS, statusMessage("3EB0STAT001", LinkedMessageContainer.of("status body")));
 
         var stanza = captured.get();
         assertEquals("message", stanza.description());
@@ -103,7 +103,7 @@ class StatusMessageSenderTest {
                 StubDeviceService.create().withStatusFanout(
                         audience -> Set.of(AUDIENCE_DEVICE)));
 
-        sender.send(STATUS, statusMessage("3EB0STAT002", MessageContainer.of("status with no privacy entry")));
+        sender.send(STATUS, statusMessage("3EB0STAT002", LinkedMessageContainer.of("status with no privacy entry")));
 
         var stanza = captured.get();
         var meta = stanza.getChild("meta").orElse(null);
@@ -158,7 +158,7 @@ class StatusMessageSenderTest {
                     return Set.of(AUDIENCE_DEVICE);
                 }));
 
-        sender.send(STATUS, statusMessage("3EB0STATAUD", MessageContainer.of("audience probe")));
+        sender.send(STATUS, statusMessage("3EB0STATAUD", LinkedMessageContainer.of("audience probe")));
         return audienceRef.get();
     }
 
@@ -192,7 +192,7 @@ class StatusMessageSenderTest {
     }
 
     private static ChatMessageInfo statusMessage(
-            String id, MessageContainer container) {
+            String id, LinkedMessageContainer container) {
         var key = new MessageKeyBuilder()
                 .id(id)
                 .parentJid(STATUS)

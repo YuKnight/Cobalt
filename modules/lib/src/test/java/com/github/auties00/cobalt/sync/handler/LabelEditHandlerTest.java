@@ -3,16 +3,16 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.preference.LabelBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.LabelEditAction;
-import com.github.auties00.cobalt.model.sync.action.contact.LabelEditActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.preference.LabelBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.LabelEditAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.LabelEditActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the {@link LinkedWhatsAppSettingsStore#findLabel(String)}
  * read-back can be asserted directly. The merge path mutates the existing
- * {@link com.github.auties00.cobalt.model.preference.Label} in place so chat-jid
+ * {@link com.github.auties00.cobalt.wire.linked.preference.Label} in place so chat-jid
  * assignments from {@link LabelAssociationHandler} are preserved across edits.
  */
 @DisplayName("LabelEditHandler")

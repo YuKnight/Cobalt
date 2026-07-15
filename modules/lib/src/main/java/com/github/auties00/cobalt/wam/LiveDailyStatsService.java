@@ -2,25 +2,25 @@ package com.github.auties00.cobalt.wam;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.privacy.DefenseModePrivacyValue;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingValue;
-import com.github.auties00.cobalt.model.privacy.ReadReceiptsPrivacyValue;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.privacy.DefenseModePrivacyValue;
+import com.github.auties00.cobalt.wire.linked.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.wire.linked.privacy.PrivacySettingValue;
+import com.github.auties00.cobalt.wire.linked.privacy.ReadReceiptsPrivacyValue;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
-import com.github.auties00.cobalt.wam.event.DailyEventBuilder;
-import com.github.auties00.cobalt.wam.event.TestAnonymousDailyEventBuilder;
-import com.github.auties00.cobalt.wam.event.TestAnonymousIdLessEventBuilder;
-import com.github.auties00.cobalt.wam.event.TestAnonymousWeeklyIdEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebDynamicSamplingTestEventWithSamplingEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebDynamicSamplingTestEventWithoutSamplingEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.DailyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.TestAnonymousDailyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.TestAnonymousIdLessEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.TestAnonymousWeeklyIdEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebDynamicSamplingTestEventWithSamplingEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebDynamicSamplingTestEventWithoutSamplingEventBuilder;
 import com.github.auties00.cobalt.wam.synthetic.SyntheticTelemetryUtils;
-import com.github.auties00.cobalt.wam.type.NotificationSettingType;
-import com.github.auties00.cobalt.wam.type.PrivacySettingsContactsBuckets;
-import com.github.auties00.cobalt.wam.type.PrivacySettingsValueType;
-import com.github.auties00.cobalt.wam.type.UsernameState;
+import com.github.auties00.cobalt.wire.wam.type.NotificationSettingType;
+import com.github.auties00.cobalt.wire.wam.type.PrivacySettingsContactsBuckets;
+import com.github.auties00.cobalt.wire.wam.type.PrivacySettingsValueType;
+import com.github.auties00.cobalt.wire.wam.type.UsernameState;
 
 import java.io.File;
 
@@ -63,7 +63,7 @@ import java.util.function.Consumer;
  * once per rolling twenty-four hours across sessions.
  *
  * @see WamService
- * @see com.github.auties00.cobalt.wam.event.DailyEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.DailyEvent
  */
 @WhatsAppWebModule(moduleName = "WAWebDailyWamEvent")
 public final class LiveDailyStatsService implements DailyStatsService {
@@ -463,15 +463,15 @@ public final class LiveDailyStatsService implements DailyStatsService {
     /**
      * Maps the stored username registration state to its {@code Daily} wire enum.
      *
-     * <p>{@link com.github.auties00.cobalt.model.contact.UsernameState#RESERVED} maps to
+     * <p>{@link com.github.auties00.cobalt.wire.linked.contact.UsernameState#RESERVED} maps to
      * {@link UsernameState#RESERVED} and
-     * {@link com.github.auties00.cobalt.model.contact.UsernameState#ACTIVE} to
+     * {@link com.github.auties00.cobalt.wire.linked.contact.UsernameState#ACTIVE} to
      * {@link UsernameState#ACTIVATED}.
      *
      * @param state the stored username registration state
      * @return the matching {@link UsernameState}
      */
-    private static UsernameState mapUsernameState(com.github.auties00.cobalt.model.contact.UsernameState state) {
+    private static UsernameState mapUsernameState(com.github.auties00.cobalt.wire.linked.contact.UsernameState state) {
         return switch (state) {
             case RESERVED -> UsernameState.RESERVED;
             case ACTIVE -> UsernameState.ACTIVATED;

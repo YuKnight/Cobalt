@@ -4,12 +4,12 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.CompanionInviteContactEventBuilder;
-import com.github.auties00.cobalt.wam.event.CompanionsContactEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.ContactSearchExperienceEventBuilder;
-import com.github.auties00.cobalt.wam.event.NativeContactsNuxEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebContactListStartNewChatEventBuilder;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.event.CompanionInviteContactEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.CompanionsContactEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ContactSearchExperienceEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.NativeContactsNuxEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebContactListStartNewChatEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.*;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -46,7 +46,7 @@ import java.util.UUID;
  * over-reporting).
  *
  * @see WamService
- * @see com.github.auties00.cobalt.wam.event.CompanionsContactEventEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.CompanionsContactEventEvent
  */
 public final class SyntheticContactsTelemetry {
     /**

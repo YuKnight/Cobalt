@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.store.linked;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentity;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalProtocolStore;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;

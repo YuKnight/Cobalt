@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.calls.transport.srtp;
 
 import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreams;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SrtpAfbStreams;
 import com.github.auties00.srtp.SrtpErrorStatus;
 import com.github.auties00.srtp.SrtpPacket;
 import com.github.auties00.srtp.SrtpTransformer;

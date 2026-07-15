@@ -3,7 +3,8 @@ package com.github.auties00.cobalt.message.send;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
@@ -17,38 +18,38 @@ import com.github.auties00.cobalt.message.send.token.ContentBindingToken;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipantBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.EncCommentMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupParticipant;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupParticipantBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncCommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.AddressingModeMismatchEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdGroupParticipantMissAckEventBuilder;
-import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
-import com.github.auties00.cobalt.wam.type.AddressingMode;
-import com.github.auties00.cobalt.wam.type.ClientGroupSizeBucket;
-import com.github.auties00.cobalt.wam.type.E2eDestination;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.MismatchOriginType;
-import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
-import com.github.auties00.cobalt.wam.type.SizeBucket;
-import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
+import com.github.auties00.cobalt.wire.wam.event.AddressingModeMismatchEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdDeviceSyncAckEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdGroupParticipantMissAckEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.AddressingMode;
+import com.github.auties00.cobalt.wire.wam.type.ClientGroupSizeBucket;
+import com.github.auties00.cobalt.wire.wam.type.E2eDestination;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.wam.type.MismatchOriginType;
+import com.github.auties00.cobalt.wire.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wire.wam.type.SizeBucket;
+import com.github.auties00.cobalt.wire.wam.type.TypeOfGroupEnum;
 
 import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
@@ -257,7 +258,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         if (isBotFeedback) {
             skmsgCiphertext = null;
         } else {
-            var plaintext = MessageContainerSpec.encode(container);
+            var plaintext = LinkedMessageContainerSpec.encode(container);
             try {
                 skmsgCiphertext = encryption.encryptForGroup(groupJid, senderJid, plaintext)
                         .ciphertext();
@@ -513,7 +514,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
             throw e;
         } catch (Exception e) {
             if (Log.ERROR) {
-                LOGGER.log(Level.ERROR, "key distribution failed for " + Log.jid(String.valueOf(groupJid)), e);
+                LOGGER.log(Level.ERROR, "key distribution failed for " + new LogRedactable.User(String.valueOf(groupJid)), e);
             }
             throw new RuntimeException("Failed to send key distribution to " + groupJid, e);
         }
@@ -578,12 +579,12 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * created via Cloud API" badge; mutates the existing context info in place
      * when present and otherwise allocates a new one.
      *
-     * @param container the original {@link MessageContainer}
+     * @param container the original {@link LinkedMessageContainer}
      * @return the container with the CAPI flag applied
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateGroupMsgProtoWithCapiFlag",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static MessageContainer applyCapiFlag(MessageContainer container) {
+    private static LinkedMessageContainer applyCapiFlag(LinkedMessageContainer container) {
         var existingCtxInfo = container.messageContextInfo().orElse(null);
         if (existingCtxInfo != null) {
             existingCtxInfo.setCapiCreatedGroup(true);
@@ -604,12 +605,12 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * addressing mode; the caller forces the addressing-mode-LID branch on
      * detection.
      *
-     * @param container the {@link MessageContainer}
+     * @param container the {@link LinkedMessageContainer}
      * @return {@code true} when the payload is a CAG addon
      */
     @WhatsAppWebExport(moduleName = "WAWebSendGroupMsgJob", exports = "isCagAddon",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static boolean isCagAddonMessage(MessageContainer container) {
+    private static boolean isCagAddonMessage(LinkedMessageContainer container) {
         return switch (container.content()) {
             case EncReactionMessage _, EncCommentMessage _, EncEventResponseMessage _, PollUpdateMessage _ -> true;
             default -> false;
@@ -985,7 +986,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
     /**
      * Commits one
-     * {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * {@link com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEvent} per
      * depleted one-time pre-key reported by the last
      * {@link DeviceService#ensureSessions(Collection)} call.
      *

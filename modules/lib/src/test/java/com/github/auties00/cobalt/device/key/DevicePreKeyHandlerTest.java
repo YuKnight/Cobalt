@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.device.key;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.listener.linked;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
 
 import java.util.Collection;
 

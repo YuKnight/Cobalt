@@ -3,8 +3,8 @@ package com.github.auties00.cobalt.calls.engine.mediaplane;
 import com.github.auties00.cobalt.calls.engine.LifecycleController;
 import com.github.auties00.cobalt.calls.engine.participant.CallMembership;
 import com.github.auties00.cobalt.calls.transport.datachannel.AppDataController;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.List;
 import java.util.Optional;
@@ -173,7 +173,7 @@ public interface MediaPlane {
          * relayed picture loss indication the upper layers translate, asks the encoder to emit a fresh intra
          * frame the decoder can resynchronize on. A session whose outbound video is not running does nothing.
          * The lifecycle controller drives this from a
-         * {@link com.github.auties00.cobalt.model.call.CallInteraction.KeyFrameRequest}; it is not part of the
+         * {@link com.github.auties00.cobalt.wire.linked.call.CallInteraction.KeyFrameRequest}; it is not part of the
          * public client surface.
          *
          * @implSpec The default implementation does nothing, so a session that brings up no video plane (an

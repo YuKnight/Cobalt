@@ -1,21 +1,21 @@
 package com.github.auties00.cobalt.store.linked;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.call.CallLog;
-import com.github.auties00.cobalt.model.call.IncomingCall;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatMetadata;
-import com.github.auties00.cobalt.model.chat.ChatMute;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadataEdit;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterPin;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.call.CallLog;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMute;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataEdit;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterPin;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
 
 import java.util.Collection;
 import java.util.List;
@@ -142,7 +142,7 @@ public interface LinkedWhatsAppChatStore {
      * @param id       the message id, or {@code null}
      * @return the matching message, or empty if not present
      */
-    Optional<? extends MessageInfo> findMessageById(JidProvider provider, String id);
+    Optional<? extends LinkedMessageInfo> findMessageById(JidProvider provider, String id);
 
     /**
      * Looks up a newsletter message by newsletter and id (server id or message-key id).
@@ -168,7 +168,7 @@ public interface LinkedWhatsAppChatStore {
      * @param key the message key
      * @return the matching message, or empty if not present
      */
-    Optional<? extends MessageInfo> findMessageByKey(MessageKey key);
+    Optional<? extends LinkedMessageInfo> findMessageByKey(MessageKey key);
 
     /**
      * Resolves the message quoted by the given message, if any.
@@ -176,7 +176,7 @@ public interface LinkedWhatsAppChatStore {
      * @param info the message whose quoted reference is resolved
      * @return the quoted message, or empty if there is none or it is not stored
      */
-    Optional<? extends MessageInfo> findQuotedMessage(MessageInfo info);
+    Optional<? extends LinkedMessageInfo> findQuotedMessage(LinkedMessageInfo info);
 
     /**
      * Returns the currently tracked incoming calls.

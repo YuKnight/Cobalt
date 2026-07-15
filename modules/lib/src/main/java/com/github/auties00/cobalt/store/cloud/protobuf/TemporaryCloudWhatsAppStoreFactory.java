@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.store.cloud.protobuf;
 
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 

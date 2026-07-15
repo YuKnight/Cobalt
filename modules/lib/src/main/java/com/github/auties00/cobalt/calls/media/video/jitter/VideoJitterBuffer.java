@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.calls.media.video.jitter;
 
 import com.github.auties00.cobalt.calls.media.video.codec.EncodedVideoFrame;
 import com.github.auties00.cobalt.calls.util.RateCalculator;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

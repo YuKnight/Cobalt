@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.signaling.waitingroom;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.NoSuchElementException;
 import java.util.List;

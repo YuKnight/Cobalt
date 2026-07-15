@@ -1,8 +1,9 @@
 package com.github.auties00.cobalt.stream.receipt;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -12,27 +13,27 @@ import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.device.DeviceConstants;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageReceipt;
-import com.github.auties00.cobalt.model.message.MessageReceiptBuilder;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.device.DeviceConstants;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.MessageReceipt;
+import com.github.auties00.cobalt.wire.linked.message.MessageReceiptBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.E2eRetryRejectEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEventBuilder;
-import com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEventBuilder;
-import com.github.auties00.cobalt.wam.type.DeviceType;
-import com.github.auties00.cobalt.wam.type.E2eDeviceType;
-import com.github.auties00.cobalt.wam.type.EncryptionTypeCode;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.ReceiptStanzaStage;
-import com.github.auties00.cobalt.wam.type.RetryRejectReason;
-import com.github.auties00.cobalt.wam.type.SessionScopeType;
+import com.github.auties00.cobalt.wire.wam.event.E2eRetryRejectEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdRetryFromUnknownDeviceEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ReceiptStanzaReceiveEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.DeviceType;
+import com.github.auties00.cobalt.wire.wam.type.E2eDeviceType;
+import com.github.auties00.cobalt.wire.wam.type.EncryptionTypeCode;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.wam.type.ReceiptStanzaStage;
+import com.github.auties00.cobalt.wire.wam.type.RetryRejectReason;
+import com.github.auties00.cobalt.wire.wam.type.SessionScopeType;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.state.SignalPreKeyBundleBuilder;
@@ -69,7 +70,7 @@ import java.util.Objects;
  * re-send.</li>
  * <li>The {@code createReceiptStanzaReceiveMetric} closure from
  * {@code WAWebCreateReceiptStanzaReceiveMetric} for the
- * {@link com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEvent}
+ * {@link com.github.auties00.cobalt.wire.wam.event.ReceiptStanzaReceiveEvent}
  * telemetry that wraps the regular-receipt path.</li>
  * </ul>
  * WA Web routes simple receipts through a per-surface fan-out
@@ -122,8 +123,8 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
     /**
      * The {@link WamService} used to commit the
-     * {@link com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEvent}
-     * and {@link com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.ReceiptStanzaReceiveEvent}
+     * and {@link com.github.auties00.cobalt.wire.wam.event.MdRetryFromUnknownDeviceEvent}
      * telemetry events.
      */
     private final WamService wamService;
@@ -225,7 +226,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
     /**
      * Finalizes and commits the
-     * {@link com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.ReceiptStanzaReceiveEvent}
      * carried by {@code builder} using the fields surfaced by the parsed
      * receipt.
      *
@@ -287,7 +288,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * WAM enum value.
      *
      * <p>The classification populates {@code messageType} on the
-     * {@link com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.ReceiptStanzaReceiveEvent}
      * built by
      * {@link #commitReceiptMetric(ReceiptStanzaReceiveEventBuilder, ParsedReceipt)};
      * WA aggregates receipt telemetry by surface kind to detect regressions
@@ -521,13 +522,13 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * WA Web.
      *
      * <p>Every branch that refuses the resend commits one
-     * {@link com.github.auties00.cobalt.wam.event.E2eRetryRejectEvent} through
-     * {@link #emitRetryReject(Jid, Jid, int, MessageInfo, RetryRejectReason)}:
+     * {@link com.github.auties00.cobalt.wire.wam.event.E2eRetryRejectEvent} through
+     * {@link #emitRetryReject(Jid, Jid, int, LinkedMessageInfo, RetryRejectReason)}:
      * the retry-count ceiling maps to
      * {@link RetryRejectReason#HIGH_RETRY_COUNT}, a missing original message to
      * {@link RetryRejectReason#MESSAGE_NOT_EXIST} and a message that is not
      * outbound to {@link RetryRejectReason#OTHER}. The unknown-device branch
-     * keeps its own {@link com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEvent}
+     * keeps its own {@link com.github.auties00.cobalt.wire.wam.event.MdRetryFromUnknownDeviceEvent}
      * emission and the self-broadcast suppression path stays silent because it
      * is a duplicate-avoidance guard rather than a rejection.
      *
@@ -626,7 +627,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
     }
 
     /**
-     * Looks up the original outbound {@link MessageInfo} addressed by a
+     * Looks up the original outbound {@link LinkedMessageInfo} addressed by a
      * retry receipt.
      *
      * <p>The broadcast fallback uses the participant's user JID as the chat
@@ -646,15 +647,15 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      *                    or {@code null}
      * @param id          the original message id read from the
      *                    {@code <retry>} child
-     * @return the resolved {@link MessageInfo}, or {@code null} when the
+     * @return the resolved {@link LinkedMessageInfo}, or {@code null} when the
      *         message cannot be located in the store
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleRetryRequest",
             exports = "getTargetChat",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private MessageInfo findRetryMessage(Jid provider, Jid participant, String id) {
+    private LinkedMessageInfo findRetryMessage(Jid provider, Jid participant, String id) {
         var direct = whatsapp.store().chatStore().findMessageById(provider, id)
-                .map(MessageInfo.class::cast)
+                .map(LinkedMessageInfo.class::cast)
                 .orElse(null);
         if (direct != null) {
             return direct;
@@ -665,7 +666,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
         }
 
         return whatsapp.store().chatStore().findMessageById(participant.toUserJid(), id)
-                .map(MessageInfo.class::cast)
+                .map(LinkedMessageInfo.class::cast)
                 .orElse(null);
     }
 
@@ -687,7 +688,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * reaches {@code handleRetryRequest}. The Cobalt guard catches the
      * same case at the unified retry entry point.
      *
-     * @param message     the {@link MessageInfo} resolved by
+     * @param message     the {@link LinkedMessageInfo} resolved by
      *                    {@link #findRetryMessage(Jid, Jid, String)}
      * @param from        the {@code from} JID of the retry stanza
      * @param participant the {@code participant} JID of the retry stanza,
@@ -695,7 +696,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * @return {@code true} when the resolved message is a self-broadcast
      *         and must not be re-shipped; {@code false} otherwise
      */
-    private boolean isBroadcastSelfRetry(MessageInfo message, Jid from, Jid participant) {
+    private boolean isBroadcastSelfRetry(LinkedMessageInfo message, Jid from, Jid participant) {
         var parentJid = message.key().parentJid().orElse(null);
         if (parentJid == null || !parentJid.hasBroadcastServer() || parentJid.isStatusBroadcastAccount()) {
             return false;
@@ -814,7 +815,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
             whatsapp.store().save();
         } catch (Throwable throwable) {
             if (Log.WARNING) {
-                LOGGER.log(Level.WARNING, "failed to process retry key bundle for " + Log.jid(String.valueOf(remoteDevice)), throwable);
+                LOGGER.log(Level.WARNING, "failed to process retry key bundle for " + new LogRedactable.User(String.valueOf(remoteDevice)), throwable);
             }
         }
     }
@@ -894,7 +895,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
     /**
      * Commits one
-     * {@link com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.MdRetryFromUnknownDeviceEvent}
      * to the {@link WamService}.
      *
      * <p>The event is emitted when the retry requester is unknown to the
@@ -925,7 +926,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
     /**
      * Commits one
-     * {@link com.github.auties00.cobalt.wam.event.E2eRetryRejectEvent} for a
+     * {@link com.github.auties00.cobalt.wire.wam.event.E2eRetryRejectEvent} for a
      * retry request the local client refuses to satisfy as the message
      * sender.
      *
@@ -967,7 +968,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
     @WhatsAppWebExport(moduleName = "WAWebProcessRetryKeyBundle",
             exports = "getMsgIfAuthorized",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void emitRetryReject(Jid requester, Jid chat, int retryCount, MessageInfo message, RetryRejectReason reason) {
+    private void emitRetryReject(Jid requester, Jid chat, int retryCount, LinkedMessageInfo message, RetryRejectReason reason) {
         var deviceId = Math.max(requester.device(), 0);
         var builder = new E2eRetryRejectEventBuilder()
                 .senderDeviceType(deviceId == DeviceConstants.PRIMARY_DEVICE_ID ? DeviceType.PRIMARY : DeviceType.COMPANION)
@@ -986,7 +987,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
     /**
      * Classifies the retry requester's device into the {@link E2eDeviceType}
      * WAM enum value carried by
-     * {@link com.github.auties00.cobalt.wam.event.E2eRetryRejectEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.E2eRetryRejectEvent}.
      *
      * <p>The classification splits on whether the requesting device belongs to
      * the local account and on whether it is a primary, companion or hosted
@@ -1023,7 +1024,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * Returns {@code true} when the rejected message is a revoke.
      *
      * <p>The result drives the {@code retryRevoke} flag on
-     * {@link com.github.auties00.cobalt.wam.event.E2eRetryRejectEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.E2eRetryRejectEvent}.
      * Newsletter messages and a {@code null} message resolve to {@code false}
      * because only chat messages carry a revoke {@link ProtocolMessage}.
      *
@@ -1038,7 +1039,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * @return {@code true} when {@code message} is a revoke; {@code false}
      *         otherwise
      */
-    private static boolean isRevokeMessage(MessageInfo message) {
+    private static boolean isRevokeMessage(LinkedMessageInfo message) {
         return message instanceof ChatMessageInfo chatMessageInfo
                 && chatMessageInfo.message().content() instanceof ProtocolMessage protocolMessage
                 && protocolMessage.type().orElse(null) == ProtocolMessage.Type.REVOKE;
@@ -1064,12 +1065,12 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * @param participant the {@code participant} JID, used as a broadcast
      *                    fallback; may be {@code null}
      * @param id          the external message id
-     * @return the matching {@link MessageInfo}, or {@code null} when the
+     * @return the matching {@link LinkedMessageInfo}, or {@code null} when the
      *         message is not in the store
      */
-    private MessageInfo findMessage(Jid provider, Jid participant, String id) {
+    private LinkedMessageInfo findMessage(Jid provider, Jid participant, String id) {
         var direct = whatsapp.store().chatStore().findMessageById(provider, id)
-                .map(MessageInfo.class::cast)
+                .map(LinkedMessageInfo.class::cast)
                 .orElse(null);
         if (direct != null) {
             return direct;
@@ -1080,13 +1081,13 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
         }
 
         return whatsapp.store().chatStore().findMessageById(participant.toUserJid(), id)
-                .map(MessageInfo.class::cast)
+                .map(LinkedMessageInfo.class::cast)
                 .orElse(null);
     }
 
     /**
      * Folds one per-participant receipt event into the existing
-     * {@link MessageInfo}, then fans out
+     * {@link LinkedMessageInfo}, then fans out
      * {@link LinkedWhatsAppClientListener#onMessageStatus}.
      *
      * <p>Both {@link ChatMessageInfo} and {@link NewsletterMessageInfo} are
@@ -1115,7 +1116,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      */
     private void updateMessage(
             ReceiptLike receipt,
-            MessageInfo info,
+            LinkedMessageInfo info,
             String messageId,
             Jid participantDevice,
             ReceiptAck ack,
@@ -1566,7 +1567,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
     /**
      * Maps a {@link ReceiptAck} to the corresponding {@link MessageStatus}
-     * milestone stored on {@link MessageInfo}.
+     * milestone stored on {@link LinkedMessageInfo}.
      *
      * <p>The {@link ReceiptAck#CONTENT_GONE} and {@link ReceiptAck#INACTIVE}
      * acks map to {@link MessageStatus#ERROR} because both indicate a
@@ -1707,7 +1708,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * @return the updated immutable {@link MessageReceipt} list
      */
     private List<MessageReceipt> mergeReceipt(
-            MessageInfo info,
+            LinkedMessageInfo info,
             Jid userJid,
             Instant receiptTimestamp,
             Instant readTimestamp,
@@ -1810,7 +1811,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      *
      * @param info the message whose status has changed
      */
-    private void notifyMessageStatus(MessageInfo info) {
+    private void notifyMessageStatus(LinkedMessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
             if (listener instanceof MessageStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, info));
@@ -1866,7 +1867,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      *
      * <p>The result decides whether the raw ack string is safe to forward to
      * the
-     * {@link com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.ReceiptStanzaReceiveEvent}
      * {@code receiptStanzaType} field. Unrecognized strings would skew the
      * WAM enum bucket counts on the server and are therefore filtered out.
      *

@@ -9,12 +9,12 @@ import com.github.auties00.cobalt.listener.MessageDeletedListener;
 import com.github.auties00.cobalt.listener.MessageStatusListener;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
-import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.business.profile.BusinessProfile;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
 
 import java.util.List;
 import java.util.Objects;
@@ -126,7 +126,7 @@ public sealed interface WhatsAppClient<SELF extends WhatsAppClient<SELF>> permit
     /**
      * Sends a message to a recipient and returns the key that identifies it.
      *
-     * <p>The {@link MessageContainer} is the universal, transport-independent message model. The
+     * <p>The {@link LinkedMessageContainer} is the universal, transport-independent message model. The
      * Linked client encrypts and dispatches it over the socket; the Cloud client translates it to
      * the Cloud {@code /messages} REST shape and posts it. The returned {@link MessageKey} carries
      * the recipient and the freshly minted message id (the {@code wamid} on the Cloud transport),
@@ -136,18 +136,18 @@ public sealed interface WhatsAppClient<SELF extends WhatsAppClient<SELF>> permit
      * @param message   the message content to send
      * @return the key identifying the sent message
      */
-    MessageKey sendMessage(JidProvider recipient, MessageContainer message);
+    MessageKey sendMessage(JidProvider recipient, LinkedMessageContainer message);
 
     /**
-     * Sends a pre-assembled {@link MessageInfo}.
+     * Sends a pre-assembled {@link LinkedMessageInfo}.
      *
      * <p>This overload is for callers that have already built a full message descriptor (recipient,
-     * content, and metadata). The Cloud client reads the recipient and {@link MessageContainer} out
+     * content, and metadata). The Cloud client reads the recipient and {@link LinkedMessageContainer} out
      * of the descriptor and posts them; the Linked client dispatches the descriptor directly.
      *
      * @param messageInfo the message descriptor to send
      */
-    void sendMessage(MessageInfo messageInfo);
+    void sendMessage(LinkedMessageInfo messageInfo);
 
     /**
      * Reacts to a message with an emoji.

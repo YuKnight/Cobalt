@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.listener.linked;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.Collection;
 
@@ -24,7 +24,7 @@ public non-sealed interface LinkedContactBlacklistListener extends LinkedListene
      *
      * @apiNote
      * Fires each time
-     * {@link LinkedWhatsAppClient#refreshContactBlacklist(String, com.github.auties00.cobalt.model.setting.privacy.ContactBlacklistAddressingMode)}
+     * {@link LinkedWhatsAppClient#refreshContactBlacklist(String, com.github.auties00.cobalt.wire.linked.setting.privacy.ContactBlacklistAddressingMode)}
      * commits a fresh server-authoritative view of that category. Use
      * to redraw the privacy settings surface against the new
      * authoritative set.

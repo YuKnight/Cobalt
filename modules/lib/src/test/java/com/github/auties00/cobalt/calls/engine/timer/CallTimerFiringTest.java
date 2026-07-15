@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * terminal teardown, the firing mechanism the P9 caller-lonely and connected-lonely teardown relies on.
  *
  * <p>The P9 timer teardown is a two-part chain: the {@code LiveCallTimerScheduler} arms a real
- * {@link CallTimers.Timer} with a callback that ends the call with {@link com.github.auties00.cobalt.model.call.CallEndReason#TIMEOUT},
+ * {@link CallTimers.Timer} with a callback that ends the call with {@link com.github.auties00.cobalt.wire.linked.call.CallEndReason#TIMEOUT},
  * and this driver fires that callback at the deadline. That scheduler is package-private to the engine
  * assembler and not constructible here, so this suite pins the half it can reach directly: that the driver
  * fires a one-shot, that a self-rescheduling callback runs the recovered number of times before stopping

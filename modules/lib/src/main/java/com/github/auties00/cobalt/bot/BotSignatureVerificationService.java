@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.bot;
 
-import com.github.auties00.cobalt.model.bot.feedback.BotSignatureVerificationMetadata;
-import com.github.auties00.cobalt.model.bot.feedback.BotSignatureVerificationUseCaseProof.BotSignatureUseCase;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.bot.feedback.BotSignatureVerificationMetadata;
+import com.github.auties00.cobalt.wire.linked.bot.feedback.BotSignatureVerificationUseCaseProof.BotSignatureUseCase;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 
 /**
  * Verifies the cryptographic signature carried by a forwarded AI bot message against Meta's

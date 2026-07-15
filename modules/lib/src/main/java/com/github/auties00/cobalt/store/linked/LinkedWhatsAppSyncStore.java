@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.store.linked;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
-import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.sync.mutation.OrphanMutationEntry;
-import com.github.auties00.cobalt.model.sync.action.SyncActionEntry;
-import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.device.sync.MissingDeviceSyncKey;
+import com.github.auties00.cobalt.wire.linked.device.sync.PendingDeviceSync;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.OrphanMutationEntry;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionEntry;
+import com.github.auties00.cobalt.wire.linked.sync.SyncCollectionMetadata;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 
 import java.time.Instant;

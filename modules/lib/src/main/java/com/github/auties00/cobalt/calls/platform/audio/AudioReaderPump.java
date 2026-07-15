@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.calls.platform.audio;
 
 import com.github.auties00.cobalt.calls.stream.AudioFrame;
 import com.github.auties00.cobalt.calls.stream.AudioOutput;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

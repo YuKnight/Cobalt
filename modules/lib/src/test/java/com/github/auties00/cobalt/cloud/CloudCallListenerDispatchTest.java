@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.cloud;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
-import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
-import com.github.auties00.cobalt.model.cloud.CloudCallPermissionResponse;
-import com.github.auties00.cobalt.model.cloud.CloudCallStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.CloudCallEvent;
+import com.github.auties00.cobalt.wire.cloud.CloudCallPermissionResponse;
+import com.github.auties00.cobalt.wire.cloud.CloudCallStatus;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

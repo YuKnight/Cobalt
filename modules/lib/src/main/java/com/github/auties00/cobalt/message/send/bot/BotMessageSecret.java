@@ -17,9 +17,9 @@ import java.util.Objects;
  * AES-GCM alongside the envelope's encryption IV and payload. It lets plaintext
  * sent to a bot be encrypted with a key the user can rotate without exposing the
  * original {@code messageSecret} value carried by the message
- * {@link com.github.auties00.cobalt.model.chat.ChatMessageContextInfo}. It is
+ * {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo}. It is
  * produced by {@link #derive(byte[])} and installed by
- * {@link BotProtobufTransform#transformForCapi(com.github.auties00.cobalt.model.message.MessageContainer, byte[])}
+ * {@link BotProtobufTransform#transformForCapi(com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer, byte[])}
  * when preparing an outbound CAPI bot message.
  */
 @WhatsAppWebModule(moduleName = "WAWebBotMessageSecret")

@@ -4,30 +4,30 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.NewsletterStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.FutureProofMessageType;
-import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.media.*;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollResultSnapshotMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.QuestionResponseMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.linked.message.Message;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.*;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollResultSnapshotMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.QuestionResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 
@@ -57,7 +57,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * Defines the {@code edit} attribute value stamped onto a newsletter
      * text-or-media edit ({@code "3"}), distinct from the regular message-edit
      * ({@code "1"}) and pin-in-chat ({@code "2"}) values used by
-     * {@link MessageSender#resolveEditAttribute(MessageContainer)}.
+     * {@link MessageSender#resolveEditAttribute(LinkedMessageContainer)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebAck", exports = "EDIT_ATTR",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -109,7 +109,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
             var innerContent = container.content();
             var mediaSubtype = resolveSmaxMediaType(innerContent);
             var isMedia = !"text".equals(mediaSubtype);
-            var payload = MessageContainerSpec.encode(MessageContainer.of(innerContent));
+            var payload = LinkedMessageContainerSpec.encode(LinkedMessageContainer.of(innerContent));
             var metaNode = containerType == FutureProofMessageType.QUESTION
                     ? MetaStanza.buildNewsletterQuestion()
                     : MetaStanza.buildNewsletterQuestionReply();
@@ -191,7 +191,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterTextMixin", exports = "applyMixin",
             adaptation = WhatsAppAdaptation.DIRECT)
     private StanzaBuilder buildText(NewsletterMessageInfo info, Jid newsletterJid) {
-        var payload = MessageContainerSpec.encode(info.message());
+        var payload = LinkedMessageContainerSpec.encode(info.message());
         var plaintextNode = NewsletterStanza.buildPlaintext(payload);
         return new StanzaBuilder()
                 .description("message")
@@ -210,13 +210,13 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      *
      * @param messageInfo   the outgoing {@link NewsletterMessageInfo}
      * @param newsletterJid the newsletter {@link Jid}
-     * @param container     the question-response {@link MessageContainer}
+     * @param container     the question-response {@link LinkedMessageContainer}
      * @return the {@code <message>} {@link StanzaBuilder}
      */
     @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterQuestionResponsePublishMixin",
             exports = "applyMixin", adaptation = WhatsAppAdaptation.DIRECT)
-    private static StanzaBuilder buildQuestionResponse(NewsletterMessageInfo messageInfo, Jid newsletterJid, MessageContainer container) {
-        var payload = MessageContainerSpec.encode(container);
+    private static StanzaBuilder buildQuestionResponse(NewsletterMessageInfo messageInfo, Jid newsletterJid, LinkedMessageContainer container) {
+        var payload = LinkedMessageContainerSpec.encode(container);
         var metaNode = MetaStanza.buildNewsletterQuestionResponse();
         var plaintextNode = NewsletterStanza.buildPlaintext(payload);
         return new StanzaBuilder()
@@ -247,7 +247,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     private StanzaBuilder buildMedia(
             NewsletterMessageInfo info, Jid newsletterJid, String mediaType
     ) {
-        var payload = MessageContainerSpec.encode(info.message());
+        var payload = LinkedMessageContainerSpec.encode(info.message());
         var plaintextNode = NewsletterStanza.buildPlaintext(payload, mediaType);
         return new StanzaBuilder()
                 .description("message")
@@ -279,7 +279,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     private StanzaBuilder buildPoll(
             NewsletterMessageInfo info, Jid newsletterJid, String polltype
     ) {
-        var payload = MessageContainerSpec.encode(info.message());
+        var payload = LinkedMessageContainerSpec.encode(info.message());
         var metaNode = new StanzaBuilder()
                 .description("meta")
                 .attribute("polltype", polltype)
@@ -336,13 +336,13 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     private StanzaBuilder buildEdit(NewsletterMessageInfo info, Jid newsletterJid) {
         var protocolMessage = (ProtocolMessage) info.message().content();
         var editedMessage = protocolMessage.editedMessage();
-        var editedContent = editedMessage.map(MessageContainer::content).orElse(null);
+        var editedContent = editedMessage.map(LinkedMessageContainer::content).orElse(null);
 
         var mediaSubtype = editedContent != null ? resolveSmaxMediaType(editedContent) : "text";
         var isMediaEdit = !"text".equals(mediaSubtype);
         var stanzaType = isMediaEdit ? "media" : "text";
 
-        var payload = MessageContainerSpec.encode(info.message());
+        var payload = LinkedMessageContainerSpec.encode(info.message());
         var plaintextNode = isMediaEdit
                 ? NewsletterStanza.buildPlaintext(payload, mediaSubtype)
                 : NewsletterStanza.buildPlaintext(payload);
@@ -529,7 +529,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * message.
      *
      * <p>Distinct from
-     * {@link MessageSender#resolveStanzaType(MessageContainer)} (which returns
+     * {@link MessageSender#resolveStanzaType(LinkedMessageContainer)} (which returns
      * the outer-stanza classification): this returns the specific media-subtype
      * string written to the inner {@code <plaintext>} child. Defaults to
      * {@code "text"} for anything that is not a recognised media payload.

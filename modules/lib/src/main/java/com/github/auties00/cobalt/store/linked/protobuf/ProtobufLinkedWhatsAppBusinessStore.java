@@ -1,30 +1,31 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.bot.AiThreadTitle;
-import com.github.auties00.cobalt.model.bot.BotWelcomeRequestState;
-import com.github.auties00.cobalt.model.business.AgentState;
-import com.github.auties00.cobalt.model.business.BusinessBroadcastCampaign;
-import com.github.auties00.cobalt.model.business.BusinessBroadcastInsight;
-import com.github.auties00.cobalt.model.business.BusinessBroadcastList;
-import com.github.auties00.cobalt.model.business.BusinessCampaignStatus;
-import com.github.auties00.cobalt.model.business.BusinessFeatureFlag;
-import com.github.auties00.cobalt.model.business.BusinessSubscription;
-import com.github.auties00.cobalt.model.business.MarketingMessage;
-import com.github.auties00.cobalt.model.business.MarketingMessageBroadcast;
-import com.github.auties00.cobalt.model.business.NoteState;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingPreference;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingSetting;
-import com.github.auties00.cobalt.model.chat.ChatAssignment;
-import com.github.auties00.cobalt.model.chat.InteractiveMessageState;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.payment.OrphanPaymentNotification;
-import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
-import com.github.auties00.cobalt.model.sync.action.media.MusicUserIdAction;
-import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethod;
-import com.github.auties00.cobalt.model.sync.action.payment.MerchantPaymentPartnerAction;
-import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.bot.AiThreadTitle;
+import com.github.auties00.cobalt.wire.linked.bot.BotWelcomeRequestState;
+import com.github.auties00.cobalt.wire.linked.business.AgentState;
+import com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastCampaign;
+import com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastInsight;
+import com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList;
+import com.github.auties00.cobalt.wire.linked.business.BusinessCampaignStatus;
+import com.github.auties00.cobalt.wire.linked.business.BusinessFeatureFlag;
+import com.github.auties00.cobalt.wire.linked.business.BusinessSubscription;
+import com.github.auties00.cobalt.wire.linked.business.MarketingMessage;
+import com.github.auties00.cobalt.wire.linked.business.MarketingMessageBroadcast;
+import com.github.auties00.cobalt.wire.linked.business.NoteState;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaDataSharingPreference;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaDataSharingSetting;
+import com.github.auties00.cobalt.wire.linked.chat.ChatAssignment;
+import com.github.auties00.cobalt.wire.linked.chat.InteractiveMessageState;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.payment.OrphanPaymentNotification;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.MusicUserIdAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.payment.CustomPaymentMethod;
+import com.github.auties00.cobalt.wire.linked.sync.action.payment.MerchantPaymentPartnerAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.payment.PaymentTosAction;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 
 import java.lang.System.Logger.Level;
@@ -349,7 +350,7 @@ final class ProtobufLinkedWhatsAppBusinessStore implements LinkedWhatsAppBusines
         } finally {
             nonceLock.unlock();
         }
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "business account nonce updated: {0}", Log.token(nonce));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "business account nonce updated: {0}", new LogRedactable.Token(nonce));
         return this;
     }
 

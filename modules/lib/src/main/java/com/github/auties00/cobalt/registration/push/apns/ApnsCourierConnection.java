@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsBag;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsCourierCrypto;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsPacket;
@@ -597,7 +598,7 @@ final class ApnsCourierConnection {
             if (json != null) {
                 var regcode = json.getString("regcode");
                 if (Log.DEBUG && regcode != null) {
-                    LOGGER.log(Level.DEBUG, "apns push code received {0}", Log.code(regcode));
+                    LOGGER.log(Level.DEBUG, "apns push code received {0}", new LogRedactable.Code(regcode));
                 }
                 pushCode.deliver(regcode);
             }

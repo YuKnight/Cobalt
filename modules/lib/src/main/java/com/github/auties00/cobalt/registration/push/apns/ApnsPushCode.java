@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsPayloadTag;
 
 import java.io.IOException;
@@ -108,7 +109,7 @@ final class ApnsPushCode {
         synchronized (lock) {
             if (this.code == null) {
                 this.code = code;
-                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns push code stored {0}", Log.code(code));
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns push code stored {0}", new LogRedactable.Code(code));
                 lock.notifyAll();
             }
         }

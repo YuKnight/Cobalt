@@ -2,15 +2,15 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.preference.OnboardingHintStateBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.device.NuxAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.preference.OnboardingHintStateBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.device.NuxAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -93,7 +93,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * {@link NuxAction} coalesces {@link NuxAction#acknowledged()} to
      * {@code false} and STILL writes the hint state. The resolved key and
      * dismissed flag are persisted via
-     * {@link LinkedWhatsAppSettingsStore#putOnboardingHintState(com.github.auties00.cobalt.model.preference.OnboardingHintState)}.
+     * {@link LinkedWhatsAppSettingsStore#putOnboardingHintState(com.github.auties00.cobalt.wire.linked.preference.OnboardingHintState)}.
      *
      * @implNote
      * This implementation drops the WA Web timestamp on the NUX data because

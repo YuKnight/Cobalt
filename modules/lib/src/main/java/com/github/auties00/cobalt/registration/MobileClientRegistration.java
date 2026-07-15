@@ -7,14 +7,15 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushCl
 import com.github.auties00.cobalt.client.linked.info.WhatsAppMobileClientInfo;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.business.*;
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.business.*;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
@@ -790,7 +791,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
         var verifyScreen = currentVerifyScreen();
         sendFunnelLog(verifyScreen, "submit_code", "submit_code_attempt");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "submitting verification code {0}", Log.code(code));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "submitting verification code {0}", new LogRedactable.Code(code));
 
         var attrs = getRegistrationOptions(true, "code", normalizeCodeResult(code));
         var result = sendRequest("/register", attrs);

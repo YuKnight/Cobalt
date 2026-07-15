@@ -5,23 +5,23 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.AttachmentTrayActionsEventBuilder;
-import com.github.auties00.cobalt.wam.event.BannerEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.BugReportSessionEventBuilder;
-import com.github.auties00.cobalt.wam.event.ChatFilterEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.ChatFolderOpenEventBuilder;
-import com.github.auties00.cobalt.wam.event.ContactUsSessionEventBuilder;
-import com.github.auties00.cobalt.wam.event.DialogEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.GuestUpsellInteractionEventBuilder;
-import com.github.auties00.cobalt.wam.event.SearchActionEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.SearchUserJourneyEventBuilder;
-import com.github.auties00.cobalt.wam.event.UiActionEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcButterbarEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcMenuEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcNativeUpsellCtaEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcNavbarEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcWhatsNewImpressionEventBuilder;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.event.AttachmentTrayActionsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.BannerEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.BugReportSessionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ChatFilterEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ChatFolderOpenEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ContactUsSessionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.DialogEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.GuestUpsellInteractionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.SearchActionEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.SearchUserJourneyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.UiActionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcButterbarEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcMenuEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcNativeUpsellCtaEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcNavbarEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcWhatsNewImpressionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.*;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -55,7 +55,7 @@ import java.util.UUID;
  * shaped like a genuine client without over-reporting).
  *
  * @see WamService
- * @see com.github.auties00.cobalt.wam.event.UiActionEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.UiActionEvent
  */
 public final class SyntheticUiInteractionTelemetry {
     /**

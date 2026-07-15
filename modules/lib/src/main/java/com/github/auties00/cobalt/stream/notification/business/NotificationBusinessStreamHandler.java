@@ -1,33 +1,34 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedBusinessPrivacySettingChangedListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.BusinessCampaignStatusBuilder;
-import com.github.auties00.cobalt.model.business.BusinessFeatureFlagBuilder;
-import com.github.auties00.cobalt.model.business.BusinessDataSharingConsent;
-import com.github.auties00.cobalt.model.business.BusinessSubscriptionBuilder;
-import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxBannerSuggestionAction;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxBannerSuggestionBanner;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxBannerSuggestionFalseTrueFlag;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxBannerSuggestionResponse;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxCampaignStateChangedNotificationResponse;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxNonceNotificationResponse;
-import com.github.auties00.cobalt.stanza.smax.biz.SmaxSyncPrivacySettingResponse;
+import com.github.auties00.cobalt.wire.linked.business.BusinessCampaignStatusBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BusinessFeatureFlagBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BusinessDataSharingConsent;
+import com.github.auties00.cobalt.wire.linked.business.BusinessSubscriptionBuilder;
+import com.github.auties00.cobalt.wire.linked.business.profile.BusinessProfile;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxBannerSuggestionAction;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxBannerSuggestionBanner;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxBannerSuggestionFalseTrueFlag;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxBannerSuggestionResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxCampaignStateChangedNotificationResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxNonceNotificationResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.SmaxSyncPrivacySettingResponse;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.CtwaActionBannerUnderstandEventBuilder;
-import com.github.auties00.cobalt.wam.type.PreferredLinkType;
+import com.github.auties00.cobalt.wire.wam.event.CtwaActionBannerUnderstandEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.PreferredLinkType;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -200,7 +201,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                 if (Log.DEBUG) {
                     LOGGER.log(Level.DEBUG,
                             "bot profile update for {0}, category={1}",
-                            Log.jid(botJid),
+                            new LogRedactable.User(botJid),
                             child.getAttributeAsString("category", null));
                 }
             }
@@ -318,7 +319,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG,
                     "cannot handle hash-based business removal (hash={0}), requesting side-list redistribution",
-                    Log.secret(hash));
+                    new LogRedactable.Secret(hash));
         }
         return true;
     }
@@ -328,9 +329,9 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
      * {@code <verified_name>} child targets a JID, and returns the side-list flag when the targeting is hash-based.
      *
      * <p>For self, the verified name is resolved through
-     * {@link LinkedWhatsAppClient#queryName(com.github.auties00.cobalt.model.jid.JidProvider)} and the
+     * {@link LinkedWhatsAppClient#queryName(com.github.auties00.cobalt.wire.core.jid.JidProvider)} and the
      * {@code syncedBusinessCertificate} flag is set; for a peer, the change is reflected through
-     * {@link LinkedWhatsAppClient#queryBusinessProfile(com.github.auties00.cobalt.model.jid.JidProvider)}. The hash branch
+     * {@link LinkedWhatsAppClient#queryBusinessProfile(com.github.auties00.cobalt.wire.core.jid.JidProvider)}. The hash branch
      * always returns {@code true} because Cobalt has no hash-keyed contact lookup.
      *
      * @param verifiedNameStanza the {@code <verified_name>} child stanza
@@ -355,7 +356,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG,
                     "cannot handle hash-based verified name change (hash={0}), requesting side-list redistribution",
-                    Log.secret(hash));
+                    new LogRedactable.Secret(hash));
         }
         return true;
     }
@@ -393,7 +394,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG,
                     "cannot handle hash-based business profile update (hash={0}), requesting side-list redistribution",
-                    Log.secret(hash));
+                    new LogRedactable.Secret(hash));
         }
         return true;
     }
@@ -404,7 +405,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
      * @implNote
      * This implementation does not refresh the catalog from the server. Cobalt has no in-memory catalog cache, so the
      * change is observable only on the next explicit
-     * {@link LinkedWhatsAppClient#queryBusinessCatalog(com.github.auties00.cobalt.model.jid.JidProvider)} call.
+     * {@link LinkedWhatsAppClient#queryBusinessCatalog(com.github.auties00.cobalt.wire.core.jid.JidProvider)} call.
      *
      * @param catalogStanza the {@code <product_catalog>} child stanza
      */
@@ -567,7 +568,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                 .ifPresent(nonce -> {
                     whatsapp.store().businessStore().setBusinessAccountNonce(nonce);
                     if (Log.DEBUG) {
-                        LOGGER.log(Level.DEBUG, "stored ad-account nonce {0}", Log.token(nonce));
+                        LOGGER.log(Level.DEBUG, "stored ad-account nonce {0}", new LogRedactable.Token(nonce));
                     }
                 });
     }

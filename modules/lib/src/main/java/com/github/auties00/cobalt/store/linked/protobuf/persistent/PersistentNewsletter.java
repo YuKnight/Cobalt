@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMetadata;
-import com.github.auties00.cobalt.model.newsletter.NewsletterState;
-import com.github.auties00.cobalt.model.newsletter.NewsletterViewerMetadata;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMetadata;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterState;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterViewerMetadata;
 import it.auties.protobuf.annotation.ProtobufMessage;
 
 import java.lang.System.Logger.Level;

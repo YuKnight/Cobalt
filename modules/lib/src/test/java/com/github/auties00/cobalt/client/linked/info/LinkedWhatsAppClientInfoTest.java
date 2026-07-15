@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.Faker;
 import org.junit.jupiter.api.Test;
 
 
-import static com.github.auties00.cobalt.model.device.pairing.ClientPlatformType.*;
+import static com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**

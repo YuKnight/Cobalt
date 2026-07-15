@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.props;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.time.Instant;
 import java.util.Map;

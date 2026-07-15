@@ -2,10 +2,10 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.TestWamService;
 import org.junit.jupiter.api.Assertions;
@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers {@link MessagePreparer} populating a {@link ChatMessageInfo} (or
- * {@link com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo})
- * from a raw {@link MessageContainer}: parent JID equals the chat JID with
+ * {@link com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo})
+ * from a raw {@link LinkedMessageContainer}: parent JID equals the chat JID with
  * {@code fromMe} set, sender matches the local JID, {@link MessageStatus}
  * starts {@code PENDING}, the 32-byte {@code messageSecret} is mirrored onto
  * the inner container's {@code messageContextInfo}, each call mints a fresh
@@ -44,7 +44,7 @@ class MessagePreparerTest {
     void prepareChatBasic() {
         var store = store();
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
-        var prepared = preparer.prepareChat(CHAT_PN, MessageContainer.of("hi"));
+        var prepared = preparer.prepareChat(CHAT_PN, LinkedMessageContainer.of("hi"));
 
         assertNotNull(prepared);
         assertEquals(MessageStatus.PENDING, prepared.status().orElseThrow());
@@ -61,7 +61,7 @@ class MessagePreparerTest {
     void prepareChatStampsSecret() {
         var store = store();
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
-        var prepared = preparer.prepareChat(CHAT_PN, MessageContainer.of("hi"));
+        var prepared = preparer.prepareChat(CHAT_PN, LinkedMessageContainer.of("hi"));
 
         var secret = prepared.messageSecret().orElseThrow();
         assertEquals(32, secret.length, "messageSecret must be 32 bytes");
@@ -80,8 +80,8 @@ class MessagePreparerTest {
     void prepareChatFreshIdAndSecret() {
         var store = store();
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
-        var first = preparer.prepareChat(CHAT_PN, MessageContainer.of("hi"));
-        var second = preparer.prepareChat(CHAT_PN, MessageContainer.of("hi"));
+        var first = preparer.prepareChat(CHAT_PN, LinkedMessageContainer.of("hi"));
+        var second = preparer.prepareChat(CHAT_PN, LinkedMessageContainer.of("hi"));
 
         Assertions.assertNotEquals(
                 first.key().id().orElseThrow(),
@@ -99,7 +99,7 @@ class MessagePreparerTest {
     void prepareChatToGroup() {
         var store = store();
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
-        var prepared = preparer.prepareChat(GROUP_JID, MessageContainer.of("group"));
+        var prepared = preparer.prepareChat(GROUP_JID, LinkedMessageContainer.of("group"));
         assertEquals(GROUP_JID, prepared.key().parentJid().orElseThrow());
     }
 
@@ -108,7 +108,7 @@ class MessagePreparerTest {
     void prepareChatBroadcastFlag() {
         var store = store();
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
-        var prepared = preparer.prepareChat(Jid.statusBroadcastAccount(), MessageContainer.of("status"));
+        var prepared = preparer.prepareChat(Jid.statusBroadcastAccount(), LinkedMessageContainer.of("status"));
         assertTrue(prepared.broadcast(),
                 "broadcast flag must be true when targeting the status broadcast account");
     }
@@ -120,7 +120,7 @@ class MessagePreparerTest {
         store.accountStore().setJid(null);
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
         assertThrows(IllegalStateException.class,
-                () -> preparer.prepareChat(CHAT_PN, MessageContainer.of("hi")));
+                () -> preparer.prepareChat(CHAT_PN, LinkedMessageContainer.of("hi")));
     }
 
     @Test
@@ -129,7 +129,7 @@ class MessagePreparerTest {
         var store = store();
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
         assertThrows(NullPointerException.class,
-                () -> preparer.prepareChat(null, MessageContainer.of("hi")));
+                () -> preparer.prepareChat(null, LinkedMessageContainer.of("hi")));
         assertThrows(NullPointerException.class,
                 () -> preparer.prepareChat(CHAT_PN, null));
     }
@@ -141,7 +141,7 @@ class MessagePreparerTest {
         var preparer = new MessagePreparer(store, TestWamService.create(TestWhatsAppClient.create().withStore(store)));
         var newsletter = Jid.of("120363402045452944@newsletter");
         assertThrows(IllegalArgumentException.class,
-                () -> preparer.prepareNewsletter(newsletter, MessageContainer.of("hi")));
+                () -> preparer.prepareNewsletter(newsletter, LinkedMessageContainer.of("hi")));
     }
 
     @Test

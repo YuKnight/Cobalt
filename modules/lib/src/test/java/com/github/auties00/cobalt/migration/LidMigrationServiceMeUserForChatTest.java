@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadataBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
@@ -12,10 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Covers {@link LidMigrationService#getMeUserLidOrJidForChat(com.github.auties00.cobalt.model.chat.Chat,
+ * Covers {@link LidMigrationService#getMeUserLidOrJidForChat(com.github.auties00.cobalt.wire.linked.chat.Chat,
  * LidMigrationService.TranslateMsgKeyType)}: the helper that picks which form (LID or PN) of the
  * current user's JID appears as the participant of an outgoing
- * {@link com.github.auties00.cobalt.model.message.MessageKey}. The cases walk the five-input
+ * {@link com.github.auties00.cobalt.wire.core.message.MessageKey}. The cases walk the five-input
  * decision table (chat on LID server, chat is a group, chat is a Community Announcement Group,
  * group metadata reports {@code isLidAddressingMode}, and the chosen
  * {@link LidMigrationService.TranslateMsgKeyType}) branch by branch, and drive the missing-self-LID

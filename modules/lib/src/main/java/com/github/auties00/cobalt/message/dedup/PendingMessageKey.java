@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveEncrypted
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
 
 import java.time.Instant;
 import java.util.List;

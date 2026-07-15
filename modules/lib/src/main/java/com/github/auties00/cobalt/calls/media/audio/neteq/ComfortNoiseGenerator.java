@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.calls.media.audio.neteq;
 import java.util.Arrays;
 import java.util.Random;
 import com.github.auties00.cobalt.calls.media.audio.neteq.decoder.ComfortNoiseDecoder;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 

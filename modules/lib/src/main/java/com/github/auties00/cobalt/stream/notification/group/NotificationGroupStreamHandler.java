@@ -1,26 +1,27 @@
 package com.github.auties00.cobalt.stream.notification.group;
 
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.smax.groups.SmaxGroupsGroupsDirtyNotificationResponse;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.wire.stanza.smax.groups.SmaxGroupsGroupsDirtyNotificationResponse;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.chat.ChatMetadata;
-import com.github.auties00.cobalt.model.chat.ChatPolicy;
-import com.github.auties00.cobalt.model.chat.community.CommunityMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipantBuilder;
-import com.github.auties00.cobalt.model.chat.group.GroupPartipantRole;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.ChatPolicy;
+import com.github.auties00.cobalt.wire.linked.chat.community.CommunityMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupParticipant;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupParticipantBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupPartipantRole;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.GroupJoinCEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.GroupJoinCEventBuilder;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -1252,7 +1253,7 @@ public final class NotificationGroupStreamHandler extends SocketStreamHandler.Co
         } catch (Throwable throwable) {
             if (Log.DEBUG) {
                 LOGGER.log(Level.DEBUG,
-                        "cannot refresh group metadata for " + Log.jid(String.valueOf(groupJid)),
+                        "cannot refresh group metadata for " + new LogRedactable.User(String.valueOf(groupJid)),
                         throwable);
             }
         }

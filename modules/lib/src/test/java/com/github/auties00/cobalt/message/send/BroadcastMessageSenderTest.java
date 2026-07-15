@@ -7,15 +7,15 @@ import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
-import com.github.auties00.cobalt.model.business.BroadcastListParticipantBuilder;
-import com.github.auties00.cobalt.model.business.BusinessBroadcastListBuilder;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BroadcastListParticipantBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastListBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
@@ -66,7 +66,7 @@ class BroadcastMessageSenderTest {
                         .withBroadcastFanout(recipients -> Set.of(RECIPIENT_DEVICE))
                         .withGroupPhash((devices, self) -> "2:bcast"));
 
-        sender.send(BROADCAST, broadcastMessage("3EB0BCAST01", MessageContainer.of("broadcast body")));
+        sender.send(BROADCAST, broadcastMessage("3EB0BCAST01", LinkedMessageContainer.of("broadcast body")));
 
         var stanza = captured.get();
         assertEquals(BROADCAST.toString(), stanza.getAttributeAsString("to").orElseThrow());
@@ -102,7 +102,7 @@ class BroadcastMessageSenderTest {
                 meta, reporting, wamService);
     }
 
-    private static ChatMessageInfo broadcastMessage(String id, MessageContainer container) {
+    private static ChatMessageInfo broadcastMessage(String id, LinkedMessageContainer container) {
         var key = new MessageKeyBuilder()
                 .id(id)
                 .parentJid(BROADCAST)

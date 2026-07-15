@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.text;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
@@ -15,19 +15,19 @@ import com.github.auties00.cobalt.media.transcode.text.preview.PreviewThumbnailF
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.payment.PaymentLinkMetadata.PaymentLinkHeader.PaymentLinkHeaderType;
-import com.github.auties00.cobalt.model.message.payment.PaymentLinkMetadataBuilder;
-import com.github.auties00.cobalt.model.message.payment.PaymentLinkMetadataPaymentLinkHeaderBuilder;
-import com.github.auties00.cobalt.model.message.payment.PaymentLinkMetadataPaymentLinkProviderBuilder;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.payment.PaymentLinkMetadata.PaymentLinkHeader.PaymentLinkHeaderType;
+import com.github.auties00.cobalt.wire.linked.message.payment.PaymentLinkMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.message.payment.PaymentLinkMetadataPaymentLinkHeaderBuilder;
+import com.github.auties00.cobalt.wire.linked.message.payment.PaymentLinkMetadataPaymentLinkProviderBuilder;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.WebcLinkPreviewDisplayEvent;
-import com.github.auties00.cobalt.wam.event.WebcLinkPreviewDisplayEventBuilder;
-import com.github.auties00.cobalt.wam.type.WebcDisplayStatusType;
+import com.github.auties00.cobalt.wire.wam.event.WebcLinkPreviewDisplayEvent;
+import com.github.auties00.cobalt.wire.wam.event.WebcLinkPreviewDisplayEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.WebcDisplayStatusType;
 import it.auties.linkpreview.LinkPreview;
 import it.auties.linkpreview.LinkPreviewMedia;
 
@@ -482,7 +482,7 @@ public final class TextPipeline {
      * connection, network error, interruption) by stamping the inline bytes
      * and the plaintext SHA-256 onto {@code message} so the receiver still
      * renders the LQ preview. The HQ upload goes directly through
-     * {@link MediaConnectionService#upload(com.github.auties00.cobalt.model.media.MediaProvider, MediaPayload)}
+     * {@link MediaConnectionService#upload(com.github.auties00.cobalt.wire.linked.media.MediaProvider, MediaPayload)}
      * because the JPEG payload already matches the {@code WAWebLinkPreviewUtils}
      * wire format; bypassing the transcoder avoids a redundant decode and
      * encode round-trip.

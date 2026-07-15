@@ -33,7 +33,7 @@ public class CallKeySignalSeamTest {
     @Test
     @DisplayName("no calls class references SignalSessionCipher or SignalGroupCipher outside a comment")
     public void noPrivateSignalCipher() {
-        var root = calls2SourceRoot();
+        var root = callsSourceRoot();
         var offenders = new ArrayList<String>();
         try (Stream<Path> files = Files.walk(root)) {
             files.filter(p -> p.toString().endsWith(".java"))
@@ -55,7 +55,7 @@ public class CallKeySignalSeamTest {
     @Test
     @DisplayName("LiveCallKeyExchange is reachable and routes through the message pipeline imports")
     public void callKeyCryptographyUsesMessagePipeline() {
-        var crypto = calls2SourceRoot().resolve("crypto").resolve("LiveCallKeyExchange.java");
+        var crypto = callsSourceRoot().resolve("crypto").resolve("LiveCallKeyExchange.java");
         assertTrue(Files.exists(crypto), "LiveCallKeyExchange.java must exist at " + crypto);
         var src = read(crypto);
         assertTrue(src.contains("import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;"),
@@ -77,7 +77,7 @@ public class CallKeySignalSeamTest {
      * layouts and walking ancestors of {@code user.dir} so the scan works whether the suite runs per
      * module or from the aggregator.
      */
-    private static Path calls2SourceRoot() {
+    private static Path callsSourceRoot() {
         var suffix = Path.of("src", "main", "java", "com", "github", "auties00", "cobalt", "calls");
         var moduleSuffix = Path.of("modules", "lib").resolve(suffix);
         var start = Path.of(System.getProperty("user.dir")).toAbsolutePath();

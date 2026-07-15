@@ -2,24 +2,25 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.newsletter.NewsletterPin;
-import com.github.auties00.cobalt.model.newsletter.NewsletterPinBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValue;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterPin;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterPinBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValue;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
-import com.github.auties00.cobalt.model.sync.action.contact.PinAction;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.event.MdSyncdDogfoodingFeatureUsageEventBuilder;
-import com.github.auties00.cobalt.wam.event.PinnedChatsMaxAlertEventBuilder;
-import com.github.auties00.cobalt.wam.type.MdFeatureCode;
-import com.github.auties00.cobalt.wam.type.PremiumStatusType;
+import com.github.auties00.cobalt.wire.wam.event.MdSyncdDogfoodingFeatureUsageEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PinnedChatsMaxAlertEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MdFeatureCode;
+import com.github.auties00.cobalt.wire.wam.type.PremiumStatusType;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -50,10 +51,10 @@ import java.util.List;
  * This implementation splits WA Web's unified
  * {@code WAWebPinChatSync.applyMutation} into two arms based on the JID
  * server: chat pins live as {@code pinnedTimestamp} on the
- * {@link com.github.auties00.cobalt.model.chat.Chat} model directly;
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat} model directly;
  * newsletter pins live in a dedicated {@link NewsletterPin}-keyed map on the
  * store because Cobalt's
- * {@link com.github.auties00.cobalt.model.newsletter.Newsletter} model has no
+ * {@link com.github.auties00.cobalt.wire.linked.newsletter.Newsletter} model has no
  * {@code pinnedTimestamp} field. The
  * {@link MdFeatureCode#UNPIN_4TH_CHAT_MUTATION} dogfooding WAM event is
  * committed when the cap-eviction path is taken. The exception-propagation
@@ -180,7 +181,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
                 if (Log.WARNING)
-                    LOGGER.log(Level.WARNING, "pin chat mutation malformed: unparseable jid {0}", Log.jid(chatJidString));
+                    LOGGER.log(Level.WARNING, "pin chat mutation malformed: unparseable jid {0}", new LogRedactable.User(chatJidString));
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             if (chatJid == null) {
@@ -309,7 +310,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * {@code newsletterPinStates} map on
      * {@link LinkedWhatsAppStore} keyed by the
      * newsletter JID, because Cobalt's
-     * {@link com.github.auties00.cobalt.model.newsletter.Newsletter} model has
+     * {@link com.github.auties00.cobalt.wire.linked.newsletter.Newsletter} model has
      * no {@code pinnedTimestamp} field.
      *
      * @param client            the {@link LinkedWhatsAppClient} whose store is mutated

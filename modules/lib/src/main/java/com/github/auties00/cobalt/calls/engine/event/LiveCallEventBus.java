@@ -2,9 +2,9 @@ package com.github.auties00.cobalt.calls.engine.event;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.CallInteraction;
-import com.github.auties00.cobalt.model.call.CallScreenShareState;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.CallInteraction;
+import com.github.auties00.cobalt.wire.linked.call.CallScreenShareState;
 import com.github.auties00.cobalt.listener.linked.LinkedCallEndedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallInteractionListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallLinkAdmittedListener;

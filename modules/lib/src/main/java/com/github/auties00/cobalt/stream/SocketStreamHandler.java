@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.stream;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;
@@ -162,7 +163,7 @@ public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurre
         @Override
         public final void handleAsync(Stanza stanza) {
             var key = orderingKey(stanza);
-            if (Log.TRACE) LOGGER.log(Level.TRACE, "enqueueing stanza {0} on ordering key {1}", stanza.description(), Log.jid(key));
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "enqueueing stanza {0} on ordering key {1}", stanza.description(), new LogRedactable.User(key));
             chains.compute(key, (ignoredKey, previous) -> {
                 var base = previous != null ? previous : CompletableFuture.<Void>completedFuture(null);
                 return base.handleAsync((ignoredResult, ignoredError) -> {

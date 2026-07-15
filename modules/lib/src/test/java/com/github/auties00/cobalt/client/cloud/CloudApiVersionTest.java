@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client.cloud;
 
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

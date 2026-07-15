@@ -5,13 +5,14 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.contact.OutContactBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.OutContactAction;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.contact.OutContactBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.OutContactAction;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import java.lang.System.Logger.Level;
@@ -31,10 +32,10 @@ import java.lang.System.Logger.Level;
  * <p>The whole batch is gated on
  * {@link ABProp#OUT_CONTACT_INVITES_ENABLED}: when the gate is closed every
  * mutation surfaces as {@link MutationApplicationResult#unsupported()}. A
- * {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#SET}
- * upserts an {@link com.github.auties00.cobalt.model.contact.OutContact}
+ * {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#SET}
+ * upserts an {@link com.github.auties00.cobalt.wire.linked.contact.OutContact}
  * record and a
- * {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#REMOVE}
+ * {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#REMOVE}
  * drops it; any other operation is reported as
  * {@link SyncdIndexUtils#malformedActionValue(String)}.
  *
@@ -125,12 +126,12 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * {@code indexParts[1]} must be a non-empty string parseable as a
      * {@link Jid} via {@link Jid#of(String)}; the JID must be a phone-user
      * JID ({@link Jid#hasUserServer()}); a
-     * {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#SET}
-     * upserts an {@link com.github.auties00.cobalt.model.contact.OutContact}
+     * {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#SET}
+     * upserts an {@link com.github.auties00.cobalt.wire.linked.contact.OutContact}
      * built from {@code (fullName, firstName)} normalised via
      * {@link #coalesceEmpty(String)} and {@link #deriveFirstWord(String)},
      * while a
-     * {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#REMOVE}
+     * {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#REMOVE}
      * drops the record. The frontend IPC dispatches and the {@code sendLogs}
      * debug-flush are dropped because Cobalt has no desktop bridge.
      */
@@ -158,7 +159,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
         try {
             userJid = Jid.of(userJidString);
         } catch (Exception e) {
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "out contact: malformed jid {0}", Log.jid(userJidString));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "out contact: malformed jid {0}", new LogRedactable.User(userJidString));
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

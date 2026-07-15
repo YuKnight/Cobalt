@@ -6,8 +6,8 @@ import com.github.auties00.cobalt.calls.media.video.codec.av1.bindings.CobaltRav
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;

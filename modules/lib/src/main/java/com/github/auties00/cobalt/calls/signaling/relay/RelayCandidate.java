@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.signaling.relay;
 
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;

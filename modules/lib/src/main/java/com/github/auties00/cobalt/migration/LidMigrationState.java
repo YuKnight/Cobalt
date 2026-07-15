@@ -58,7 +58,7 @@ public enum LidMigrationState {
      *
      * <p>This state is reached after the AB-prop gate fires. Mappings arrive
      * through the peer-message channel and are ingested by
-     * {@link LidMigrationService#processProtocolMessage(com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayload)},
+     * {@link LidMigrationService#processProtocolMessage(com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayload)},
      * which advances the state to {@link #READY}.
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations.flow",

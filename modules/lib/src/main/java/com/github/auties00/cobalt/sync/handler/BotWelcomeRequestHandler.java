@@ -2,16 +2,16 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.bot.BotWelcomeRequestStateBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.bot.BotWelcomeRequestStateBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.BotWelcomeRequestAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -72,7 +72,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      * {@inheritDoc}
      *
      * <p>Reads {@link BotWelcomeRequestAction#isSent()} from the mutation value,
-     * locates the target bot {@link com.github.auties00.cobalt.model.chat.Chat}
+     * locates the target bot {@link com.github.auties00.cobalt.wire.linked.chat.Chat}
      * by JID, and upserts the welcome-request state. Returns
      * {@link MutationApplicationResult#unsupported()} for {@link SyncdOperation#REMOVE}
      * operations (WA Web treats {@link SyncdOperation#REMOVE} as not supported),

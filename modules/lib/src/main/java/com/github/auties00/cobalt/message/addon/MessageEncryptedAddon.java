@@ -11,12 +11,12 @@ import java.util.Objects;
  * layer.
  *
  * <p>Instances are returned by {@link MessageAddonEncryption#encrypt(byte[],
- * byte[], String, com.github.auties00.cobalt.model.jid.Jid,
- * com.github.auties00.cobalt.model.jid.Jid, MessageAddonType)} and consumed by
+ * byte[], String, com.github.auties00.cobalt.wire.core.jid.Jid,
+ * com.github.auties00.cobalt.wire.core.jid.Jid, MessageAddonType)} and consumed by
  * the per-addon protobuf builders for
- * {@link com.github.auties00.cobalt.model.message.security.EncCommentMessage},
- * {@link com.github.auties00.cobalt.model.message.security.EncReactionMessage},
- * and {@link com.github.auties00.cobalt.model.message.poll.PollEncValue},
+ * {@link com.github.auties00.cobalt.wire.linked.message.security.EncCommentMessage},
+ * {@link com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage},
+ * and {@link com.github.auties00.cobalt.wire.linked.message.poll.PollEncValue},
  * which split the pair into the {@code encPayload} and {@code encIv} wire
  * fields. The ciphertext includes the trailing 16-byte GCM authentication
  * tag.

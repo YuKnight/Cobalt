@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client.cloud;
 
-import com.github.auties00.cobalt.model.cloud.phone.CloudVerificationMethod;
+import com.github.auties00.cobalt.wire.cloud.phone.CloudVerificationMethod;
 
 import java.util.Objects;
 import java.util.function.Supplier;

@@ -2,9 +2,9 @@ package com.github.auties00.cobalt.calls.signaling.session;
 
 import com.github.auties00.cobalt.calls.engine.control.PrivacyToken;
 import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.util.ArrayList;
 import java.util.Arrays;

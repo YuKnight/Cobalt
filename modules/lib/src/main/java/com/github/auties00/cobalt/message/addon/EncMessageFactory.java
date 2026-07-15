@@ -1,24 +1,24 @@
 package com.github.auties00.cobalt.message.addon;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.poll.PollEncValue;
-import com.github.auties00.cobalt.model.message.poll.PollEncValueBuilder;
-import com.github.auties00.cobalt.model.message.poll.PollVoteMessageBuilder;
-import com.github.auties00.cobalt.model.message.poll.PollVoteMessageSpec;
-import com.github.auties00.cobalt.model.message.security.EncCommentMessageBuilder;
-import com.github.auties00.cobalt.model.message.security.EncCommentMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessageBuilder;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.text.CommentMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessageSpec;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollEncValue;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollEncValueBuilder;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollVoteMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollVoteMessageSpec;
+import com.github.auties00.cobalt.wire.linked.message.security.EncCommentMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.security.EncCommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.CommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessageSpec;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
@@ -69,9 +69,9 @@ public final class EncMessageFactory {
      * stanza.
      *
      * <p>The comment's inner
-     * {@link com.github.auties00.cobalt.model.message.MessageContainer} is
-     * serialised via {@link MessageContainerSpec#encode(
-     * com.github.auties00.cobalt.model.message.MessageContainer)} and then
+     * {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer} is
+     * serialised via {@link LinkedMessageContainerSpec#encode(
+     * com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer)} and then
      * dual-encrypted under {@link MessageAddonType#ENC_COMMENT} so the server
      * can route the addon without reading the comment body. The sender bound
      * into the key derivation is resolved through
@@ -111,7 +111,7 @@ public final class EncMessageFactory {
 
         var commentContent = comment.message()
                 .orElseThrow(() -> new IllegalArgumentException("Comment has no message content"));
-        var plaintext = MessageContainerSpec.encode(commentContent);
+        var plaintext = LinkedMessageContainerSpec.encode(commentContent);
 
         var encrypted = MessageAddonEncryption.encrypt(
                 plaintext, parentSecret, parentKeyId,
@@ -195,11 +195,11 @@ public final class EncMessageFactory {
     /**
      * Encrypts the voter's selected option labels into a {@link PollEncValue}
      * ready to embed in an outgoing
-     * {@link com.github.auties00.cobalt.model.message.poll.PollUpdateMessage}.
+     * {@link com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage}.
      *
      * <p>Each label is SHA-256-hashed to its canonical 32-byte option digest,
      * the digests are wrapped in a
-     * {@link com.github.auties00.cobalt.model.message.poll.PollVoteMessage},
+     * {@link com.github.auties00.cobalt.wire.linked.message.poll.PollVoteMessage},
      * the protobuf is serialised, and the bytes are encrypted under
      * {@link MessageAddonType#POLL_VOTE} (an AAD-bound use case) so the server
      * cannot rebind a vote from one user to another. The sender bound into the

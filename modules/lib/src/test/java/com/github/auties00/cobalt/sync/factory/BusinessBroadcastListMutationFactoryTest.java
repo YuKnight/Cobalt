@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.sync.factory;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueSpec;
-import com.github.auties00.cobalt.model.sync.action.business.BroadcastListParticipantAction;
-import com.github.auties00.cobalt.model.sync.action.business.BroadcastListParticipantActionBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueSpec;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BroadcastListParticipantAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BroadcastListParticipantActionBuilder;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

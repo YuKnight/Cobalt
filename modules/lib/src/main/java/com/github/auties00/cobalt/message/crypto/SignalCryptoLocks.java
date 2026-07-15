@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.message.crypto;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
 
@@ -71,7 +72,7 @@ public final class SignalCryptoLocks {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
         if (Log.TRACE) {
-            LOGGER.log(Level.TRACE, "acquiring session lock user={0} device={1}", Log.jid(address.name()), address.id());
+            LOGGER.log(Level.TRACE, "acquiring session lock user={0} device={1}", new LogRedactable.User(address.name()), address.id());
         }
         return withLock(sessionLocks, address, action);
     }
@@ -92,7 +93,7 @@ public final class SignalCryptoLocks {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
         if (Log.TRACE) {
-            LOGGER.log(Level.TRACE, "acquiring session lock user={0} device={1}", Log.jid(address.name()), address.id());
+            LOGGER.log(Level.TRACE, "acquiring session lock user={0} device={1}", new LogRedactable.User(address.name()), address.id());
         }
         withLock(sessionLocks, address, action);
     }
@@ -115,7 +116,7 @@ public final class SignalCryptoLocks {
         Objects.requireNonNull(action, "action cannot be null");
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "acquiring sender-key lock group={0} sender={1}",
-                    Log.jid(senderKeyName.groupId()), Log.jid(senderKeyName.sender().name()));
+                    new LogRedactable.User(senderKeyName.groupId()), new LogRedactable.User(senderKeyName.sender().name()));
         }
         return withLock(senderKeyLocks, senderKeyName, action);
     }
@@ -137,7 +138,7 @@ public final class SignalCryptoLocks {
         Objects.requireNonNull(action, "action cannot be null");
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "acquiring sender-key lock group={0} sender={1}",
-                    Log.jid(senderKeyName.groupId()), Log.jid(senderKeyName.sender().name()));
+                    new LogRedactable.User(senderKeyName.groupId()), new LogRedactable.User(senderKeyName.sender().name()));
         }
         withLock(senderKeyLocks, senderKeyName, action);
     }

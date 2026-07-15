@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;

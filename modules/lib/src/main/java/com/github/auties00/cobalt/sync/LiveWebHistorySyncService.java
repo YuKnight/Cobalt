@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncPastPartic
 import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncProgressListener;
 import com.github.auties00.cobalt.exception.linked.WhatsAppHistorySyncException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
@@ -22,19 +22,19 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.media.StickerMetadata;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncMessageAccessStatus;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotification;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
-import com.github.auties00.cobalt.model.preference.StickerBuilder;
-import com.github.auties00.cobalt.model.sync.history.HistorySync;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.media.StickerMetadata;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncMessageAccessStatus;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncNotification;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncType;
+import com.github.auties00.cobalt.wire.linked.preference.StickerBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.history.HistorySync;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.*;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.event.*;
+import com.github.auties00.cobalt.wire.wam.type.*;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.ByteArrayInputStream;
@@ -981,15 +981,15 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * {@link LinkedWhatsAppStore}: every {@code conversation} is merged into
      * the local {@link Chat} record (metadata fields plus embedded
      * messages); every {@code pushname} is folded into a
-     * {@link com.github.auties00.cobalt.model.contact.Contact} via
-     * {@link com.github.auties00.cobalt.model.contact.Contact#setChosenName(String)};
+     * {@link com.github.auties00.cobalt.wire.linked.contact.Contact} via
+     * {@link com.github.auties00.cobalt.wire.linked.contact.Contact#setChosenName(String)};
      * every {@code statusV3Messages} entry is appended to
      * {@link LinkedWhatsAppChatStore#status()}; every {@code callLogRecords}
      * entry that carries a callId is registered through
-     * {@link LinkedWhatsAppChatStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)};
+     * {@link LinkedWhatsAppChatStore#addCallLog(com.github.auties00.cobalt.wire.linked.call.CallLog)};
      * every {@code recentStickers} entry that carries a {@code fileSha256}
-     * is folded into a {@link com.github.auties00.cobalt.model.preference.Sticker}
-     * via {@link LinkedWhatsAppSettingsStore#addRecentSticker(String, com.github.auties00.cobalt.model.preference.Sticker)},
+     * is folded into a {@link com.github.auties00.cobalt.wire.linked.preference.Sticker}
+     * via {@link LinkedWhatsAppSettingsStore#addRecentSticker(String, com.github.auties00.cobalt.wire.linked.preference.Sticker)},
      * keyed by the base64-encoded plaintext hash to match WA Web's
      * {@code WAWebRecentStickerCollectionMd} row id; the
      * {@code companionMmsAuthNonce} (wire field {@code companionMetaNonce})
@@ -1304,7 +1304,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * @implNote This implementation keys the row on the standard base64
      * encoding of {@link StickerMetadata#fileSha256()} and drops the entry
      * outright when that digest is absent. The resulting
-     * {@link com.github.auties00.cobalt.model.preference.Sticker} is built with
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Sticker} is built with
      * a non-favorite flag and no device-id hint because neither field is
      * carried by the history-sync wire shape; there is no post-batch
      * user-prefs status write because Cobalt has no equivalent surface.
@@ -1357,7 +1357,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * {@link #copyChatMetadata(Chat, Chat)}, preserving any local edits the
      * store already holds, and the embedded messages from the chunk are
      * appended to the local chat via
-     * {@link Chat#addMessage(com.github.auties00.cobalt.model.chat.ChatMessageInfo)}.
+     * {@link Chat#addMessage(com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo)}.
      *
      * @param historyChat the wire-shape chat carrying chunk metadata and
      *                    embedded messages

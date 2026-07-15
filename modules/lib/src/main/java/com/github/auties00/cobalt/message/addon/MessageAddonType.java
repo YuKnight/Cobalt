@@ -26,8 +26,8 @@ public enum MessageAddonType {
      * this label.
      *
      * <p>Drives {@link EncMessageFactory#encryptPollVote(java.util.List,
-     * com.github.auties00.cobalt.model.chat.ChatMessageInfo,
-     * com.github.auties00.cobalt.model.jid.Jid)}. Sets the AAD flag so the
+     * com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo,
+     * com.github.auties00.cobalt.wire.core.jid.Jid)}. Sets the AAD flag so the
      * AES-GCM cipher binds {@code stanzaId + "\0" + voterJid} into the tag,
      * preventing the server from reattributing a vote to a different user.
      */
@@ -40,9 +40,9 @@ public enum MessageAddonType {
      * announcement group threads.
      *
      * <p>Drives {@link EncMessageFactory#encryptReaction(
-     * com.github.auties00.cobalt.model.message.text.ReactionMessage,
-     * com.github.auties00.cobalt.model.chat.ChatMessageInfo,
-     * com.github.auties00.cobalt.model.jid.Jid)}. The default non-encrypted
+     * com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage,
+     * com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo,
+     * com.github.auties00.cobalt.wire.core.jid.Jid)}. The default non-encrypted
      * reaction wire format leaks the emoji content to the server, which is
      * unacceptable on such threads; this label selects the dual-encrypted
      * variant.
@@ -56,9 +56,9 @@ public enum MessageAddonType {
      * announcement group threads.
      *
      * <p>Drives {@link EncMessageFactory#encryptComment(
-     * com.github.auties00.cobalt.model.message.text.CommentMessage,
-     * com.github.auties00.cobalt.model.chat.ChatMessageInfo,
-     * com.github.auties00.cobalt.model.jid.Jid)}. The inner message container
+     * com.github.auties00.cobalt.wire.linked.message.text.CommentMessage,
+     * com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo,
+     * com.github.auties00.cobalt.wire.core.jid.Jid)}. The inner message container
      * payload is dual-encrypted so the server can route the comment without
      * reading its body.
      */
@@ -162,8 +162,8 @@ public enum MessageAddonType {
      * Returns the HKDF info label associated with this use case.
      *
      * <p>The label is consumed inside {@link MessageAddonEncryption#encrypt(
-     * byte[], byte[], String, com.github.auties00.cobalt.model.jid.Jid,
-     * com.github.auties00.cobalt.model.jid.Jid, MessageAddonType)} when
+     * byte[], byte[], String, com.github.auties00.cobalt.wire.core.jid.Jid,
+     * com.github.auties00.cobalt.wire.core.jid.Jid, MessageAddonType)} when
      * assembling the HKDF info parameter; it is never exposed to callers of
      * the high-level factory methods in {@link EncMessageFactory}.
      *

@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
  * cannot answer, the only remaining outcome is to log the session out, mirroring the genuine client
  * whose checkpoint modal offers no escape other than passing the challenge or logging out.
  *
- * @see com.github.auties00.cobalt.model.integrity.IntegrityChallenge
+ * @see com.github.auties00.cobalt.wire.linked.integrity.IntegrityChallenge
  * @see com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler.Web.Passkey
  */
 public final class WhatsAppIntegrityChallengeException extends WhatsAppLinkedException {

@@ -2,18 +2,18 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.bot.AiThreadTitleBuilder;
-import com.github.auties00.cobalt.model.device.capabilities.DeviceCapabilities;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.bot.AiThreadTitleBuilder;
+import com.github.auties00.cobalt.wire.linked.device.capabilities.DeviceCapabilities;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.AiThreadRenameAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -76,7 +76,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      * <p>Validates the JSON index {@code ["ai_thread_rename", chatJid, threadId]}
      * and the {@link AiThreadRenameAction#newTitle()} payload, confirms the chat
      * JID is a bot, gates on AI-thread support, and stores the new title via
-     * {@link LinkedWhatsAppBusinessStore#putAiThreadTitle(com.github.auties00.cobalt.model.bot.AiThreadTitle)}.
+     * {@link LinkedWhatsAppBusinessStore#putAiThreadTitle(com.github.auties00.cobalt.wire.linked.bot.AiThreadTitle)}.
      * Returns {@link SyncActionState#UNSUPPORTED} for non-{@link SyncdOperation#SET}
      * operations or when AI-thread support is off, {@link SyncActionState#ORPHAN}
      * when no matching thread is in the store, and {@link SyncActionState#FAILED}

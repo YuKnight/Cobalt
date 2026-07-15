@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.listener.cloud;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClientListener;
-import com.github.auties00.cobalt.model.cloud.CloudHistorySync;
+import com.github.auties00.cobalt.wire.cloud.CloudHistorySync;
 
 /**
  * A functional interface for the {@link CloudWhatsAppClientListener#onHistorySync onHistorySync} event.

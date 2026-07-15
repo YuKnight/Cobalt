@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
-import com.github.auties00.cobalt.model.chat.community.CommunityMetadataBuilder;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadataBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.chat.community.CommunityMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -2,20 +2,21 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.ConflictResolution;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.DeleteChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.DeleteChatActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.lang.System.Logger.Level;
@@ -96,7 +97,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * range against the local chat's current range and emits either a
      * partial {@code queryAndRemoveMessagesInMessageRange} or a full
      * {@code deleteFromStorage}; Cobalt always performs a full removal because
-     * the {@link com.github.auties00.cobalt.model.chat.Chat} abstraction does
+     * the {@link com.github.auties00.cobalt.wire.linked.chat.Chat} abstraction does
      * not expose per-range deletion. Any thrown exception is mapped to
      * {@link MutationApplicationResult#failed()} mirroring WA Web's
      * try/catch shape.
@@ -123,12 +124,12 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
-                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: failed to parse chat jid={0}", Log.jid(chatJidString));
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: failed to parse chat jid={0}", new LogRedactable.User(chatJidString));
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (chatJid == null) {
-                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: chat jid resolved to null, jid={0}", Log.jid(chatJidString));
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: chat jid resolved to null, jid={0}", new LogRedactable.User(chatJidString));
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 

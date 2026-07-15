@@ -5,12 +5,12 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
 import com.github.auties00.cobalt.message.send.MessageSendingService;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.List;
 
@@ -35,39 +35,39 @@ public interface MessageService {
      * <p>This allocates a message id, resolves the sender and recipient device
      * lists, encrypts the payload, ships the fanout, and blocks on the server
      * acknowledgment. This overload is for plain user-facing sends where the
-     * caller does not need to pre-build a {@link MessageInfo}.
+     * caller does not need to pre-build a {@link LinkedMessageInfo}.
      *
      * @implSpec
-     * Implementations must delegate to {@link MessageSendingService#send(Jid, MessageContainer)}.
+     * Implementations must delegate to {@link MessageSendingService#send(Jid, LinkedMessageContainer)}.
      *
      * @param chatJid   the recipient chat JID
      * @param container the message payload
      * @return the server acknowledgment outcome
      * @throws NullPointerException if {@code chatJid} or {@code container} is
      *                              {@code null}
-     * @see MessageSendingService#send(Jid, MessageContainer)
+     * @see MessageSendingService#send(Jid, LinkedMessageContainer)
      */
-    AckResult send(Jid chatJid, MessageContainer container);
+    AckResult send(Jid chatJid, LinkedMessageContainer container);
 
     /**
-     * Sends a pre-populated {@link MessageInfo} the caller has already keyed,
+     * Sends a pre-populated {@link LinkedMessageInfo} the caller has already keyed,
      * timestamped, and decorated with any extension metadata.
      *
      * <p>This overload is for messages prepared by the caller, for example when
      * rehydrating a stored draft or re-transmitting after a nack. The sending
-     * service does not mutate the supplied {@link MessageInfo}; the same
+     * service does not mutate the supplied {@link LinkedMessageInfo}; the same
      * instance can safely be passed again on a retry.
      *
      * @implSpec
-     * Implementations must delegate to {@link MessageSendingService#send(MessageInfo)}.
+     * Implementations must delegate to {@link MessageSendingService#send(LinkedMessageInfo)}.
      *
      * @param messageInfo the prepared outbound message, either a
      *                    {@link ChatMessageInfo} or a {@link NewsletterMessageInfo}
      * @return the server acknowledgment outcome
      * @throws NullPointerException if {@code messageInfo} is {@code null}
-     * @see MessageSendingService#send(MessageInfo)
+     * @see MessageSendingService#send(LinkedMessageInfo)
      */
-    AckResult send(MessageInfo messageInfo);
+    AckResult send(LinkedMessageInfo messageInfo);
 
     /**
      * Sends a peer protocol message to one of the current account's own linked
@@ -93,7 +93,7 @@ public interface MessageService {
 
     /**
      * Processes a single inbound {@code <message>} stanza and returns the typed
-     * {@link MessageInfo} ready for consumption.
+     * {@link LinkedMessageInfo} ready for consumption.
      *
      * <p>Newsletter messages are returned as {@link NewsletterMessageInfo};
      * every other shape goes through the Signal decryption pipeline and is
@@ -105,14 +105,14 @@ public interface MessageService {
      * Implementations must delegate to {@link MessageReceivingService#process(Stanza)}.
      *
      * @param stanza the raw inbound {@code <message>} stanza
-     * @return the processed {@link MessageInfo}, or {@code null} for
+     * @return the processed {@link LinkedMessageInfo}, or {@code null} for
      *         unavailable fanout placeholders
      * @throws NullPointerException if {@code stanza} is {@code null}
      * @throws WhatsAppMessageException.Receive
      *         if decryption or validation fails for an encrypted payload
      * @see MessageReceivingService#process(Stanza)
      */
-    MessageInfo process(Stanza stanza);
+    LinkedMessageInfo process(Stanza stanza);
 
     /**
      * Resolves the LID addressing a one-to-one call offer to {@code peer} must use.
@@ -141,7 +141,7 @@ public interface MessageService {
      * Decrypts a Signal-encrypted call payload into its plaintext bytes.
      *
      * <p>Used by the call layer's {@code <enc_rekey>} runtime to recover the
-     * {@link com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload E2eRekeyPayload}
+     * {@link com.github.auties00.cobalt.wire.linked.call.datachannel.E2eRekeyPayload E2eRekeyPayload}
      * the peer published. The {@code encType} attribute is the wire-level Signal envelope
      * variant ({@code msg} or {@code pkmsg}) carried on the inbound {@code <enc>} child.
      *

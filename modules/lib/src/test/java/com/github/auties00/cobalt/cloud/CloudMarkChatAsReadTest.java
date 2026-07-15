@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import com.github.auties00.cobalt.store.cloud.protobuf.ProtobufCloudWhatsAppStore;

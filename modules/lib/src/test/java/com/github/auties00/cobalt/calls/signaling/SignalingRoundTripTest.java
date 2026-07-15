@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.calls.signaling;
 
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
 import com.github.auties00.cobalt.calls.engine.control.PrivacyToken;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

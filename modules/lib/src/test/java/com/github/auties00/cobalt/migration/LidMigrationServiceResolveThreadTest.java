@@ -2,12 +2,12 @@ package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppLidMigrationException;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Covers {@link LidMigrationService#resolveThread(com.github.auties00.cobalt.model.chat.Chat)} and
+ * Covers {@link LidMigrationService#resolveThread(com.github.auties00.cobalt.wire.linked.chat.Chat)} and
  * its two-argument overload: every path of the classifier cascade that decides whether to migrate,
  * keep, or delete a chat. The cases walk the already-LID branches (including ctwa-origin
  * promotion), the server-keyed {@code Keep} branches (group, newsletter, broadcast, bot,
@@ -393,7 +393,7 @@ class LidMigrationServiceResolveThreadTest {
                 .build();
         chat.addMessage(new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.of("hi"))
+                .message(LinkedMessageContainer.of("hi"))
                 .timestamp(Instant.now())
                 .build());
 

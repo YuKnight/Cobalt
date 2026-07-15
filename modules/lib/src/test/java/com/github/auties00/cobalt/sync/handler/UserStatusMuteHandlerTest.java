@@ -3,19 +3,19 @@ package com.github.auties00.cobalt.sync.handler;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.wam.TestWamService;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadataBuilder;
-import com.github.auties00.cobalt.model.contact.ContactBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
-import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.media.FavoritesAction;
-import com.github.auties00.cobalt.model.sync.action.media.FavoritesActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.contact.ContactBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.UserStatusMuteAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.UserStatusMuteActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.FavoritesAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.FavoritesActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link UserStatusMuteHandler#getMutationForStatusMute(Jid, boolean, Instant)}
  * builder: applying an incoming mutation and asserting the {@code statusMuted}
  * side-effect on either the local
- * {@link com.github.auties00.cobalt.model.contact.Contact} or the
+ * {@link com.github.auties00.cobalt.wire.linked.contact.Contact} or the
  * {@link GroupMetadata#statusMuted()} field. The fixture pre-seeds neither
  * the contact nor the group metadata, so tests opt in case by case.
  */

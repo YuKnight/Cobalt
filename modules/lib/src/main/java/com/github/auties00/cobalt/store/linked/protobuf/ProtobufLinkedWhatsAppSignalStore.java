@@ -1,12 +1,13 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentity;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
 import com.github.auties00.libsignal.groups.state.SignalSenderKeyRecord;
@@ -292,7 +293,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
             return address;
         }
         if (address.name().equals(selfPn.user()) && !address.name().equals(selfLid.user())) {
-            if (Log.TRACE) LOGGER.log(Level.TRACE, "canonicalizing self address {0} to lid form", Log.jid(address.toString()));
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "canonicalizing self address {0} to lid form", new LogRedactable.User(address.toString()));
             return new SignalProtocolAddress(selfLid.user(), address.id());
         }
         return address;
@@ -324,7 +325,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
             return;
         }
         if (Log.DEBUG) {
-            LOGGER.log(Level.DEBUG, "migrating self signal records from {0} to {1}", Log.jid(pnUser), Log.jid(lidUser));
+            LOGGER.log(Level.DEBUG, "migrating self signal records from {0} to {1}", new LogRedactable.User(pnUser), new LogRedactable.User(lidUser));
         }
         migrateSelfMap(sessionsMap, pnUser, lidUser);
         migrateSelfMap(remoteIdentitiesMap, pnUser, lidUser);
@@ -525,7 +526,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public void addSession(SignalProtocolAddress address, SignalSessionRecord record) {
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing signal session for {0}", Log.jid(address.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing signal session for {0}", new LogRedactable.User(address.toString()));
         sessionsMap.put(canonicalAddress(address), record);
     }
 
@@ -536,13 +537,13 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public void addSenderKey(SignalSenderKeyName name, SignalSenderKeyRecord newRecord) {
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing sender key for {0}", Log.jid(name.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing sender key for {0}", new LogRedactable.User(name.toString()));
         senderKeysMap.put(name, newRecord);
     }
 
     @Override
     public boolean removeSession(SignalProtocolAddress address) {
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing signal session for {0}", Log.jid(address.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing signal session for {0}", new LogRedactable.User(address.toString()));
         return sessionsMap.remove(canonicalAddress(address)) != null;
     }
 
@@ -558,7 +559,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
     @Override
     public void removeSenderKeys(SignalSenderKeyName senderKeyName) {
         Objects.requireNonNull(senderKeyName, "senderKeyName cannot be null");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing sender key {0}", Log.jid(senderKeyName.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing sender key {0}", new LogRedactable.User(senderKeyName.toString()));
         senderKeysMap.remove(senderKeyName);
     }
 
@@ -592,7 +593,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         Objects.requireNonNull(baseKey, "baseKey cannot be null");
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "saving session base key for {0}, msgId={1}, key={2}",
-                    Log.jid(address.toString()), originalMsgId, baseKey);
+                    new LogRedactable.User(address.toString()), originalMsgId, baseKey);
         }
         baseKeysMap.put(encodeBaseKeyKey(canonicalAddress(address), originalMsgId), baseKey);
     }
@@ -612,7 +613,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         var stored = baseKeysMap.get(encodeBaseKeyKey(canonicalAddress(address), originalMsgId));
         var matches = stored != null && Arrays.equals(stored, candidate);
         if (!matches && Log.DEBUG) {
-            LOGGER.log(Level.DEBUG, "base key mismatch for {0}, msgId={1}", Log.jid(address.toString()), originalMsgId);
+            LOGGER.log(Level.DEBUG, "base key mismatch for {0}, msgId={1}", new LogRedactable.User(address.toString()), originalMsgId);
         }
         return matches;
     }
@@ -728,7 +729,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
     public boolean isTrustedIdentity(SignalProtocolAddress signalProtocolAddress, SignalIdentityPublicKey signalIdentityPublicKey, SignalKeyDirection signalKeyDirection) {
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "trust-on-first-use accept for {0}, direction={1}",
-                    Log.jid(signalProtocolAddress.toString()), signalKeyDirection);
+                    new LogRedactable.User(signalProtocolAddress.toString()), signalKeyDirection);
         }
         return true;
     }
@@ -742,7 +743,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
     public void saveIdentity(SignalProtocolAddress address, SignalIdentityPublicKey identityKey) {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(identityKey, "identityKey cannot be null");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "saving remote identity for {0}", Log.jid(address.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "saving remote identity for {0}", new LogRedactable.User(address.toString()));
         remoteIdentitiesMap.put(canonicalAddress(address), identityKey);
     }
 
@@ -762,7 +763,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         var canonical = canonicalAddress(address);
         var localJid = account == null ? null : account.jid().orElse(null);
         if (localJid != null && canonical.equals(canonicalAddress(localJid.toSignalAddress()))) {
-            if (Log.TRACE) LOGGER.log(Level.TRACE, "resolved identity for {0} as local account identity", Log.jid(canonical.toString()));
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "resolved identity for {0} as local account identity", new LogRedactable.User(canonical.toString()));
             return Optional.of(identityKeyPair.publicKey());
         }
         return Optional.ofNullable(remoteIdentitiesMap.get(canonical));

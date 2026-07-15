@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.registration;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import java.lang.System.Logger.Level;

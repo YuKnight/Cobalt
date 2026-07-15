@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.calls.config.param;
 
 import com.github.auties00.cobalt.calls.config.VoipSettingsType;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.util.EnumMap;

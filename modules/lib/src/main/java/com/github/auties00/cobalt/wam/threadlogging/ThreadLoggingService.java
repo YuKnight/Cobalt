@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.wam.threadlogging;
 
-import com.github.auties00.cobalt.model.jid.JidProvider;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
 
 /**
  * Aggregates per-thread interaction activity and uploads it once per day as the family of

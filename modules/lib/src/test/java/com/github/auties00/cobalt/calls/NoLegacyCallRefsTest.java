@@ -138,8 +138,8 @@ class NoLegacyCallRefsTest {
      * {@code src/main/java} root by stripping the five package segments
      * {@code com/github/auties00/cobalt/calls}.
      */
-    private static Path upToSrcMainJava(Path calls2Dir) {
-        var dir = calls2Dir;
+    private static Path upToSrcMainJava(Path callsDir) {
+        var dir = callsDir;
         for (var i = 0; i < 5; i++) {
             dir = dir.getParent();
         }

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.config;
 
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.util.Objects;

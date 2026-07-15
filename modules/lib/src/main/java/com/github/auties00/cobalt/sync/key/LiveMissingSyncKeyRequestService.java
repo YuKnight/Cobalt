@@ -1,31 +1,31 @@
 package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKeyBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequest;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequestBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.device.sync.MissingDeviceSyncKeyBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyIdBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyRequest;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyRequestBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncdCoordinator;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
-import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wire.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.BootstrapAppStateDataStageCode;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -384,7 +384,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
      * preserving the iteration order of the input device list.
      *
      * <p>All messages share the same {@link ProtocolMessage} payload but each carries a freshly
-     * generated {@link com.github.auties00.cobalt.model.message.MessageKey} id so the relay
+     * generated {@link com.github.auties00.cobalt.wire.core.message.MessageKey} id so the relay
      * treats them as independent peer messages rather than a duplicate broadcast. Every message
      * is parented to the user-level JID without a device suffix. The own JID must be available;
      * its absence throws.
@@ -409,7 +409,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
                 .type(ProtocolMessage.Type.APP_STATE_SYNC_KEY_REQUEST)
                 .appStateSyncKeyRequest(keyRequest)
                 .build();
-        var messageContainer = new MessageContainerBuilder()
+        var messageContainer = new LinkedMessageContainerBuilder()
                 .protocolMessage(protocolMessage)
                 .build();
 

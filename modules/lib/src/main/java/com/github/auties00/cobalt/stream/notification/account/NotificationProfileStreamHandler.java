@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
@@ -10,8 +11,8 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListener;
 import com.github.auties00.cobalt.listener.linked.LinkedProfilePictureChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.contact.ContactTextStatus;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatus;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.net.URI;
@@ -247,7 +248,7 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
             } else {
                 var fromStr = stanza.getAttributeAsString("from", "[unknown]");
                 if (Log.WARNING) LOGGER.log(Level.WARNING,
-                        "handleAboutNotification: unhandled type, unknown from {0}", Log.jid(fromStr));
+                        "handleAboutNotification: unhandled type, unknown from {0}", new LogRedactable.User(fromStr));
             }
         } catch (Throwable throwable) {
             if (Log.WARNING) LOGGER.log(Level.WARNING,

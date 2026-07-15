@@ -1,12 +1,13 @@
 package com.github.auties00.cobalt.device.fanout;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceList;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.lang.System.Logger.Level;
@@ -118,7 +119,7 @@ public final class DeviceFanoutCalculator {
         }
 
         if (Log.DEBUG && !fallbackWids.isEmpty()) {
-            var redactedWids = fallbackWids.stream().map(Log::jid).toList();
+            var redactedWids = fallbackWids.stream().map(LogRedactable.User::new).toList();
             LOGGER.log(Level.DEBUG,
                     "[getFanOutList] no device for {0} wids => primary {1}",
                     fallbackWids.size(),

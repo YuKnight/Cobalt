@@ -1,16 +1,17 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
-import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogEntry;
-import com.github.auties00.cobalt.model.business.catalog.BusinessReviewStatus;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.business.BusinessVerifiedName;
+import com.github.auties00.cobalt.wire.linked.business.catalog.BusinessCatalogEntry;
+import com.github.auties00.cobalt.wire.linked.business.catalog.BusinessReviewStatus;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
 
 import java.lang.System.Logger.Level;
 import java.net.http.HttpClient;
@@ -91,7 +92,7 @@ public final class CatalogPreviewResolver {
         try {
             wid = Jid.of(ownerJid);
         } catch (RuntimeException malformed) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "catalog preview owner jid malformed: {0}", Log.jid(ownerJid));
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "catalog preview owner jid malformed: {0}", new LogRedactable.User(ownerJid));
             return false;
         }
         var catalog = safeQueryCatalog(client, wid);
@@ -144,7 +145,7 @@ public final class CatalogPreviewResolver {
         try {
             return client.queryBusinessCatalog(wid);
         } catch (RuntimeException e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "catalog query failed for " + Log.jid(String.valueOf(wid)), e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "catalog query failed for " + new LogRedactable.User(String.valueOf(wid)), e);
             return List.of();
         }
     }
@@ -222,7 +223,7 @@ public final class CatalogPreviewResolver {
                 return refreshed;
             }
         } catch (RuntimeException e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "business profile query failed for " + Log.jid(String.valueOf(wid)), e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "business profile query failed for " + new LogRedactable.User(String.valueOf(wid)), e);
         }
         return wid.user();
     }

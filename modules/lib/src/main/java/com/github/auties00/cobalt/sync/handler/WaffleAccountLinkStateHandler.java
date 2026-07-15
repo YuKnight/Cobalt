@@ -1,31 +1,31 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestType;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestType;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.device.WaffleAccountLinkStateAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilder;
-import com.github.auties00.cobalt.wam.event.WaffleCompanionStateLifecycleEventBuilder;
-import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
-import com.github.auties00.cobalt.wam.type.WaffleLifecycleLinkStateType;
-import com.github.auties00.cobalt.wam.type.WaffleLifecycleTraceActionType;
-import com.github.auties00.cobalt.wam.type.WaffleLifecycleTraceSourceType;
+import com.github.auties00.cobalt.wire.wam.event.NonMessagePeerDataRequestEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WaffleCompanionStateLifecycleEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.PeerDataRequestType;
+import com.github.auties00.cobalt.wire.wam.type.WaffleLifecycleLinkStateType;
+import com.github.auties00.cobalt.wire.wam.type.WaffleLifecycleTraceActionType;
+import com.github.auties00.cobalt.wire.wam.type.WaffleLifecycleTraceSourceType;
 import com.github.auties00.cobalt.wam.WamService;
 
 import java.lang.System.Logger.Level;
@@ -265,7 +265,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
                 .type(ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_MESSAGE)
                 .peerDataOperationRequestMessage(request)
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .protocolMessage(protocol)
                 .build();
         var sessionId = MessageIdGenerator.generate(MessageIdVersion.V2, me);

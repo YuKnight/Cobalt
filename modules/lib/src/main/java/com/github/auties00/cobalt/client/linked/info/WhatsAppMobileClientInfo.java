@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client.linked.info;
 
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
 
 /**
  * Sealed sub root of {@link LinkedWhatsAppClientInfo} for the native mobile clients (Android consumer, Android business, iOS

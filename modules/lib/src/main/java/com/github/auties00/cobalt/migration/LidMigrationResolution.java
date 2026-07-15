@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 /**
  * Sealed discriminated union describing the decision the 1:1 LID migration
  * takes for a single chat thread.
  *
  * <p>An instance is produced by the per-chat resolution step in
- * {@link LiveLidMigrationService#resolveThread(com.github.auties00.cobalt.model.chat.Chat, java.util.Set)}
+ * {@link LiveLidMigrationService#resolveThread(com.github.auties00.cobalt.wire.linked.chat.Chat, java.util.Set)}
  * and consumed by the executor that applies the decision to the local store.
  * The three permitted variants are mutually exclusive: {@link Migrate} re-keys
  * the chat to LID, {@link Keep} leaves it untouched (because it already uses

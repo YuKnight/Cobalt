@@ -2,18 +2,19 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.mutation.OrphanMutationEntry;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.ContactAction;
-import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.OrphanMutationEntry;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.ContactAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.UserStatusMuteAction;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
@@ -31,7 +32,7 @@ import java.util.regex.Pattern;
  * renames, or deletes an address-book contact on another device, the server
  * replays the change here as a {@link ContactAction}, and the result becomes
  * observable through
- * {@link LinkedWhatsAppContactStore#findContactByJid(com.github.auties00.cobalt.model.jid.JidProvider)}.
+ * {@link LinkedWhatsAppContactStore#findContactByJid(com.github.auties00.cobalt.wire.core.jid.JidProvider)}.
  *
  * @implNote
  * This implementation drops several WA Web batch-level side effects
@@ -42,7 +43,7 @@ import java.util.regex.Pattern;
  * batched {@code bulkGet} that filters out username-only contacts
  * before clearing address-book fields. The username-contact filter is
  * implemented per-mutation against the local
- * {@link com.github.auties00.cobalt.model.contact.Contact#isAddedByUsername()}
+ * {@link com.github.auties00.cobalt.wire.linked.contact.Contact#isAddedByUsername()}
  * flag instead. LID-PN learning is performed inline via
  * {@link LinkedWhatsAppContactStore#registerLidMapping(Jid, Jid)}
  * rather than batched and committed via WA Web's
@@ -118,7 +119,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      *
      * <p>For SET mutations, validates the JSON index
      * {@code ["contact", contactJid]}, skips LID JIDs, upserts the
-     * {@link com.github.auties00.cobalt.model.contact.Contact} with its full
+     * {@link com.github.auties00.cobalt.wire.linked.contact.Contact} with its full
      * name, derived short name, optional username, and LID mapping, and retries
      * any pending orphan {@code user_status_mute} mutations for the same JID.
      * For REMOVE mutations, skips LID and bot JIDs and clears the contact's
@@ -133,7 +134,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * {@link ABProp#USERNAME_CONTACT_SYNCD_SUPPORT_ENABLE} is set,
      * matching WA Web's {@code usernameContactSyncdEnabled()} gate.
      * Username-only contacts (those flagged
-     * {@link com.github.auties00.cobalt.model.contact.Contact#isAddedByUsername()})
+     * {@link com.github.auties00.cobalt.wire.linked.contact.Contact#isAddedByUsername()})
      * survive a REMOVE when the gate is on, mirroring WA Web's
      * {@code bulkGet} filter that exempts {@code isUsernameContact === true}
      * entries from address-book clearing.
@@ -268,7 +269,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                 if (Log.DEBUG) LOGGER.log(Level.DEBUG, "orphan status mutes reapplied: count={0}", applied.size());
             }
         } catch (Exception e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "orphan status mutes retry failed for contact " + Log.jid(contactJidString), e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "orphan status mutes retry failed for contact " + new LogRedactable.User(contactJidString), e);
         }
     }
 

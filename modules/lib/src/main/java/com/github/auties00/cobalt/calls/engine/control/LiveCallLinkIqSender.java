@@ -3,10 +3,10 @@ package com.github.auties00.cobalt.calls.engine.control;
 import com.github.auties00.cobalt.calls.signaling.CallMessage;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

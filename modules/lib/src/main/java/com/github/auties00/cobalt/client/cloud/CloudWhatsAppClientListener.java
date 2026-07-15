@@ -10,26 +10,27 @@ import com.github.auties00.cobalt.listener.cloud.*;
 
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.listener.cloud.CloudMessagePricingListener;
-import com.github.auties00.cobalt.model.cloud.CloudAccountUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudAppStateSyncContact;
-import com.github.auties00.cobalt.model.cloud.CloudBusinessCapabilityUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
-import com.github.auties00.cobalt.model.cloud.CloudMessagePricing;
-import com.github.auties00.cobalt.model.cloud.CloudCallSettings;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowStatusUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudHistorySync;
-import com.github.auties00.cobalt.model.cloud.commerce.CloudPaymentConfiguration;
-import com.github.auties00.cobalt.model.cloud.phone.CloudPhoneNumberUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudSecurityUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudSystemUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateCategoryUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentsUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplatePauseUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateQualityUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateStatusUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudUserPreferenceUpdate;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.wire.cloud.CloudAccountUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudAppStateSyncContact;
+import com.github.auties00.cobalt.wire.cloud.CloudBusinessCapabilityUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudCallEvent;
+import com.github.auties00.cobalt.wire.cloud.CloudMessagePricing;
+import com.github.auties00.cobalt.wire.cloud.CloudCallSettings;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowStatusUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudHistorySync;
+import com.github.auties00.cobalt.wire.cloud.commerce.CloudPaymentConfiguration;
+import com.github.auties00.cobalt.wire.cloud.phone.CloudPhoneNumberUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudSecurityUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudSystemUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateCategoryUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponentsUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplatePauseUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateQualityUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateStatusUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudUserPreferenceUpdate;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
 
 /**
  * Aggregator listener for every event a {@link CloudWhatsAppClient} emits.

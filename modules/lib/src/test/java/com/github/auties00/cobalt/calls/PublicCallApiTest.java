@@ -18,12 +18,12 @@ import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.MessageService;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -233,7 +233,7 @@ class PublicCallApiTest {
                                boolean video, int participantCount,
                                com.github.auties00.cobalt.calls.engine.participant.CallMembership membership,
                                MediaStreams streams,
-                               com.github.auties00.cobalt.model.jid.Jid peerDeviceJid,
+                               com.github.auties00.cobalt.wire.core.jid.Jid peerDeviceJid,
                                Optional<String> electedRelayName,
                                com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener listener) {
             bringUps.add(new BringUp(callId, isCaller, video, List.copyOf(voipSettings), participantCount, streams));
@@ -283,7 +283,7 @@ class PublicCallApiTest {
     private static final class NoopRegistry implements CallContextRegistry {
         @Override
         public com.github.auties00.cobalt.calls.engine.context.CallContext allocate(
-                com.github.auties00.cobalt.model.call.Call call, CallLifecycleState initialState) {
+                com.github.auties00.cobalt.wire.linked.call.Call call, CallLifecycleState initialState) {
             return null;
         }
 
@@ -408,12 +408,12 @@ class PublicCallApiTest {
         }
 
         @Override
-        public AckResult send(Jid chatJid, MessageContainer container) {
+        public AckResult send(Jid chatJid, LinkedMessageContainer container) {
             throw new UnsupportedOperationException("not stubbed");
         }
 
         @Override
-        public AckResult send(MessageInfo messageInfo) {
+        public AckResult send(LinkedMessageInfo messageInfo) {
             throw new UnsupportedOperationException("not stubbed");
         }
 
@@ -423,7 +423,7 @@ class PublicCallApiTest {
         }
 
         @Override
-        public MessageInfo process(Stanza stanza) {
+        public LinkedMessageInfo process(Stanza stanza) {
             throw new UnsupportedOperationException("not stubbed");
         }
 

@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.bot;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.stanza.mex.json.bot.FetchBotCertificateRevocationListMexRequest;
-import com.github.auties00.cobalt.stanza.mex.json.bot.FetchBotCertificateRevocationListMexResponse;
+import com.github.auties00.cobalt.wire.stanza.mex.json.bot.FetchBotCertificateRevocationListMexRequest;
+import com.github.auties00.cobalt.wire.stanza.mex.json.bot.FetchBotCertificateRevocationListMexResponse;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
 import java.io.ByteArrayInputStream;

@@ -4,20 +4,20 @@ import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
-import com.github.auties00.cobalt.model.device.DeviceListMetadataBuilder;
-import com.github.auties00.cobalt.model.message.MessageContainer;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.device.DeviceListMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
 
 /**
  * Stamps Identity Change Detection Consistency device-list metadata onto
- * outgoing {@link MessageContainer} instances.
+ * outgoing {@link LinkedMessageContainer} instances.
  *
  * <p>This utility lets a recipient detect any change to the sender's or
  * recipient's device list since the last key exchange by carrying a
- * {@link com.github.auties00.cobalt.model.device.DeviceListMetadata} inside the
- * container's {@link com.github.auties00.cobalt.model.chat.ChatMessageContextInfo}.
+ * {@link com.github.auties00.cobalt.wire.linked.device.DeviceListMetadata} inside the
+ * container's {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo}.
  * A message that omits this metadata loses the integrity check rather than being
- * rejected. The only entry point is {@link #enrich(MessageContainer, IcdcResult, IcdcResult)};
+ * rejected. The only entry point is {@link #enrich(LinkedMessageContainer, IcdcResult, IcdcResult)};
  * it is called from the per-recipient fanout path, including
  * {@link com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution}.
  */
@@ -35,10 +35,10 @@ public final class IcdcEnricher {
 
     /**
      * Returns a copy of {@code container} with ICDC device-list metadata merged
-     * into its {@link com.github.auties00.cobalt.model.chat.ChatMessageContextInfo}.
+     * into its {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo}.
      *
      * <p>The supplied sender and recipient {@link IcdcResult} pair populates a
-     * {@link com.github.auties00.cobalt.model.device.DeviceListMetadata} on the
+     * {@link com.github.auties00.cobalt.wire.linked.device.DeviceListMetadata} on the
      * container's context info, every other context-info field is preserved, and
      * {@code deviceListMetadataVersion} is set to {@code 2}. When both
      * {@link IcdcResult} inputs are {@code null} the method is a no-op and the
@@ -47,15 +47,15 @@ public final class IcdcEnricher {
      * @implNote
      * This implementation reproduces WA Web's spread merge by copying every
      * present field of the existing
-     * {@link com.github.auties00.cobalt.model.chat.ChatMessageContextInfo} into a
+     * {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo} into a
      * fresh {@link ChatMessageContextInfoBuilder} before overwriting
      * {@code deviceListMetadata} and {@code deviceListMetadataVersion}; the
-     * {@link MessageContainer} is then replaced via
-     * {@link MessageContainer#withMessageContextInfo(com.github.auties00.cobalt.model.chat.ChatMessageContextInfo)}
+     * {@link LinkedMessageContainer} is then replaced via
+     * {@link LinkedMessageContainer#withMessageContextInfo(com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo)}
      * so the original instance stays untouched. The version constant {@code 2}
      * matches the value WA Web pins for ICDC device-list metadata.
      *
-     * @param container     the original {@link MessageContainer}
+     * @param container     the original {@link LinkedMessageContainer}
      * @param senderIcdc    the sender's {@link IcdcResult}, or {@code null}
      * @param recipientIcdc the recipient's {@link IcdcResult}, or {@code null}
      * @return the enriched container; the original instance when both ICDC
@@ -65,8 +65,8 @@ public final class IcdcEnricher {
             adaptation = WhatsAppAdaptation.DIRECT)
     @WhatsAppWebExport(moduleName = "WAWebICDCMetaApi", exports = "populateICDCMeta",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public static MessageContainer enrich(
-            MessageContainer container,
+    public static LinkedMessageContainer enrich(
+            LinkedMessageContainer container,
             IcdcResult senderIcdc,
             IcdcResult recipientIcdc
     ) {

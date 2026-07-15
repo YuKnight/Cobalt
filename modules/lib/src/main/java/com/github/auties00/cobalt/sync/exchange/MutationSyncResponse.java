@@ -2,10 +2,10 @@ package com.github.auties00.cobalt.sync.exchange;
 
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
-import com.github.auties00.cobalt.model.media.ExternalBlobReference;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.SyncdPatch;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReference;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdPatch;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.*;
 

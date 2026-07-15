@@ -5,12 +5,12 @@ import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKeyBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyDataBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
+import com.github.auties00.cobalt.wire.linked.device.sync.MissingDeviceSyncKeyBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyDataBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyIdBuilder;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;

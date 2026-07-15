@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.call.CallLog;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
-import com.github.auties00.cobalt.model.sync.action.call.DeleteIndividualCallLogAction;
+import com.github.auties00.cobalt.wire.linked.call.CallLog;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.call.CallLogAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.call.DeleteIndividualCallLogAction;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -24,7 +24,7 @@ import java.util.List;
  * {@linkplain DeleteIndividualCallLogAction#peerJid() peer JID} and the call
  * {@linkplain DeleteIndividualCallLogAction#isIncoming() direction}; the server replays it to every other
  * device, and this handler bulk-removes the matching entries from the runtime call-history table. It is
- * distinct from the per-call-id {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#REMOVE}
+ * distinct from the per-call-id {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#REMOVE}
  * path of {@link CallLogHandler}, which drops one record by call id: this action targets a whole
  * peer-plus-direction group at once.
  *
@@ -38,7 +38,7 @@ import java.util.List;
  *
  * @implNote This implementation is the inbound handler for the {@code delete_individual_call_log} action,
  * which the legacy Cobalt sync handler set never wired (only the per-call-id {@code call_log} action was
- * handled); calls2 adds it for cross-device parity, matching the WASM call-log table semantics where a
+ * handled); the calls package adds it for cross-device parity, matching the WASM call-log table semantics where a
  * by-peer purge removes the engine's whole linked-list run for that peer. The action carries no call id of
  * its own, so the by-call-id store key cannot be used directly; the table scan is the deliberate Cobalt
  * adaptation of WA Web's per-peer deletion. The {@code callLogStates} table is runtime-only and rebuilt
@@ -109,8 +109,8 @@ public final class DeleteIndividualCallLogHandler implements WebAppStateActionHa
      * {@link MutationApplicationResult#failed()} so a single bad deletion never aborts the patch.
      *
      * @implNote
-     * This implementation applies on both {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#SET}
-     * and {@link com.github.auties00.cobalt.model.sync.data.SyncdOperation#REMOVE} because the action body
+     * This implementation applies on both {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#SET}
+     * and {@link com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation#REMOVE} because the action body
      * is self-describing: the {@code delete_individual_call_log} action denotes a removal regardless of the
      * wire operation, so it is not gated on the operation as the {@code call_log} handler is.
      *

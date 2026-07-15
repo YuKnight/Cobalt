@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.util;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.RandomIdUtils;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;

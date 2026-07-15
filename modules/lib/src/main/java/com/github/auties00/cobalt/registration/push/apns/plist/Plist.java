@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.plist;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.binary.PlistBinaryParser;
 import com.github.auties00.cobalt.registration.push.apns.plist.binary.PlistBinaryWriter;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue;

@@ -1,40 +1,41 @@
 package com.github.auties00.cobalt.stream.iq;
 
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.graphql.whatsappWeb.auth.CanonicalNonceDecryptor;
-import com.github.auties00.cobalt.graphql.whatsappWeb.auth.WhatsAppWebGraphQlBootstrapClient;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSessionBuilder;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlCanonicalNonceDecryptor;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlBootstrapClient;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.business.webgraphql.WhatsAppWebGraphQlSessionBuilder;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.pairing.ShortcakePairingService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.identity.ADVDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentityBuilder;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.device.pairing.ClientPairingProps;
-import com.github.auties00.cobalt.model.device.pairing.ClientPairingPropsSpec;
-import com.github.auties00.cobalt.model.device.pairing.LinkedPrimaryPlatform;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.smax.mdcompanion.SmaxMdSetRegEncryptionMetadata;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVDeviceIdentitySpec;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentity;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentityBuilder;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPairingProps;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPairingPropsSpec;
+import com.github.auties00.cobalt.wire.linked.device.pairing.LinkedPrimaryPlatform;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.stanza.smax.mdcompanion.SmaxMdSetRegEncryptionMetadata;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.CanonicalEntRecoveryCriticalEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdLinkDeviceCompanionEventBuilder;
-import com.github.auties00.cobalt.wam.type.MdLinkDeviceCompanionStage;
-import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
+import com.github.auties00.cobalt.wire.wam.event.CanonicalEntRecoveryCriticalEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.Lid11MigrationLifecycleEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdLinkDeviceCompanionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MdLinkDeviceCompanionStage;
+import com.github.auties00.cobalt.wire.wam.type.MigrationStageEnum;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
@@ -638,7 +639,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                 validatedIdentity.accountSignatureKey().orElse(null),
                 store.signalStore().identityKeyPair().publicKey().toEncodedPoint()
         );
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pair-success adv identity validated, session {0}", Log.token(mdSessionId));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pair-success adv identity validated, session {0}", new LogRedactable.Token(mdSessionId));
         emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_SUCCESS_RECEIVED, null, mdSessionId, regStartSeconds);
 
         try {
@@ -681,7 +682,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
      * Web makes at the end of {@code handlePairSuccess}: it reads the optional
      * {@code <encryption-metadata/>} child of {@code <pair-success/>}, decrypts
      * the canonical nonce blob with
-     * {@link CanonicalNonceDecryptor#decrypt(byte[], byte[], SmaxMdSetRegEncryptionMetadata)}
+     * {@link WhatsAppWebGraphQlCanonicalNonceDecryptor#decrypt(byte[], byte[], SmaxMdSetRegEncryptionMetadata)}
      * (HKDF-SHA256 over the ADV secret key salted by the Noise static public
      * key, then AES-256-GCM), stitches in the local device id taken from the
      * paired JID, fetches the {@code lsd} token and exchanges the credentials at
@@ -728,7 +729,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
             }
 
             var noiseStaticPublicKey = store.signalStore().noiseKeyPair().publicKey().toEncodedPoint();
-            var credentials = CanonicalNonceDecryptor.decrypt(
+            var credentials = WhatsAppWebGraphQlCanonicalNonceDecryptor.decrypt(
                             store.signalStore().advSecretKey().orElse(null), noiseStaticPublicKey, metadata)
                     .orElse(null);
             if (credentials == null) {

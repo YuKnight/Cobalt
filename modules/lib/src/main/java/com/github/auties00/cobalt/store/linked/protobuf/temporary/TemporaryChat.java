@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.store.linked.protobuf.temporary;
 
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
 
 import java.util.Objects;

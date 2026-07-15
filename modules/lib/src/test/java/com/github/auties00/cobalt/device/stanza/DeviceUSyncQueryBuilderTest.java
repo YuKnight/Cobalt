@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.device.stanza;
 
-import com.github.auties00.cobalt.model.device.info.DeviceListHashInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceListHashInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.calls.signaling.relay;
 
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;

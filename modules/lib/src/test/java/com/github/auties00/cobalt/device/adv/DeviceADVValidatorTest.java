@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.device.adv;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;

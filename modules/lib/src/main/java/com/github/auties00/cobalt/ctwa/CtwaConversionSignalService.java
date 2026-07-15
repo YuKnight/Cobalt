@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.ctwa;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaOrderStatus;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.preference.Label;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaOrderStatus;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.linked.preference.Label;
 
 /**
  * Emits the WhatsApp Business Click-To-WhatsApp (CTWA) conversion-signal telemetry when a business

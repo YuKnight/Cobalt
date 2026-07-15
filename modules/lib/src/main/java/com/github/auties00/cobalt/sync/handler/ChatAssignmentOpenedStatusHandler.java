@@ -2,16 +2,16 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatAssignmentBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.ChatAssignmentBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ChatAssignmentOpenedStatusAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -25,12 +25,12 @@ import java.lang.System.Logger.Level;
  * chat on another device, the server replays the resulting
  * {@link ChatAssignmentOpenedStatusAction} here, and the result becomes
  * observable via the {@code opened} flag on
- * {@link com.github.auties00.cobalt.model.chat.ChatAssignment} as surfaced by
+ * {@link com.github.auties00.cobalt.wire.linked.chat.ChatAssignment} as surfaced by
  * {@link LinkedWhatsAppBusinessStore#findChatAssignment(Jid)}.
  *
  * @implNote
  * This implementation reuses the same
- * {@link com.github.auties00.cobalt.model.chat.ChatAssignment}
+ * {@link com.github.auties00.cobalt.wire.linked.chat.ChatAssignment}
  * record managed by {@link ChatAssignmentHandler} rather than the
  * separate {@code ChatAssignmentCollection} entry WA Web tracks; the
  * upsert preserves the existing {@code agentId} and only mutates the
@@ -81,7 +81,7 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
      * {@code ["agentChatAssignmentOpenedStatus", chatJid, agentId]}, resolves
      * the chat by JID, confirms the existing assignment matches the same
      * agent, then upserts the
-     * {@link com.github.auties00.cobalt.model.chat.ChatAssignment} with the new
+     * {@link com.github.auties00.cobalt.wire.linked.chat.ChatAssignment} with the new
      * {@code opened} flag. Returns
      * {@link MutationApplicationResult#unsupported()} for non-{@code SET}
      * operations and orphan results when the chat or its existing assignment is

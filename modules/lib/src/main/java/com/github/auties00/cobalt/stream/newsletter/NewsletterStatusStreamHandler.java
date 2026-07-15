@@ -1,20 +1,20 @@
 package com.github.auties00.cobalt.stream.newsletter;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -29,7 +29,7 @@ import java.time.Instant;
  * but not materialised, and admin-revoke variants ({@code edit="8"}) are logged and skipped.
  *
  * @implNote
- * This implementation decodes the {@code <plaintext>} child via {@link MessageContainerSpec#decode(byte[])}
+ * This implementation decodes the {@code <plaintext>} child via {@link LinkedMessageContainerSpec#decode(byte[])}
  * on the dispatch thread; decode failures are demoted to a debug log rather than thrown because a
  * single malformed channel post must not poison the stream. Admin-revoke ({@code edit="8"}) stanzas
  * are dropped rather than projected into synthetic protocol-revoke messages, leaving that mapping for
@@ -42,7 +42,7 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      * Logs debug-level diagnostics while parsing newsletter status stanzas.
      *
      * <p>Receives debug entries for skipped revoke stanzas, missing plaintext payloads, and
-     * {@link MessageContainerSpec#decode(byte[])} failures. Downstream code never relies on these
+     * {@link LinkedMessageContainerSpec#decode(byte[])} failures. Downstream code never relies on these
      * messages.
      */
     private static final System.Logger LOGGER = Log.get(NewsletterStatusStreamHandler.class);
@@ -80,7 +80,7 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      * @implNote
      * This implementation drops admin-revoke ({@code edit="8"}) stanzas rather than synthesising a
      * protocol-revoke message; the revoke is left for a future higher-layer pathway. All other early
-     * returns happen before {@link MessageContainerSpec#decode(byte[])} runs.
+     * returns happen before {@link LinkedMessageContainerSpec#decode(byte[])} runs.
      */
     @Override
     public void handle(Stanza stanza) {
@@ -148,7 +148,7 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
 
     /**
      * Decodes the raw plaintext payload carried by a newsletter status stanza into a typed
-     * {@link MessageContainer}.
+     * {@link LinkedMessageContainer}.
      *
      * <p>Returns {@code null} rather than throwing when the bytes cannot be parsed, so that a single
      * unparseable stanza cannot abort the dispatch loop.
@@ -159,11 +159,11 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      *
      * @param id        the stanza identifier, included in the debug log message for traceability
      * @param plaintext the raw protobuf bytes lifted from the {@code <plaintext>} child stanza
-     * @return the decoded {@link MessageContainer}, or {@code null} when the bytes cannot be parsed
+     * @return the decoded {@link LinkedMessageContainer}, or {@code null} when the bytes cannot be parsed
      */
-    private MessageContainer decodeMessage(String id, byte[] plaintext) {
+    private LinkedMessageContainer decodeMessage(String id, byte[] plaintext) {
         try {
-            return MessageContainerSpec.decode(plaintext);
+            return LinkedMessageContainerSpec.decode(plaintext);
         } catch (Exception exception) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG,
                     "failed to decode newsletter status " + id, exception);
@@ -190,7 +190,7 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      * Appends the decoded post to the newsletter's message collection and bumps the newsletter-level
      * metadata.
      *
-     * <p>Looks up the {@link com.github.auties00.cobalt.model.newsletter.Newsletter} store entry for
+     * <p>Looks up the {@link com.github.auties00.cobalt.wire.linked.newsletter.Newsletter} store entry for
      * the given channel, lazily creating it when the channel has never been seen on this device. The
      * channel timestamp is updated to the post's timestamp regardless of authorship, the unread
      * counter is incremented only for posts the current account did not author, and the post is then
@@ -211,7 +211,7 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
 
     /**
      * Broadcasts an
-     * {@link LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, MessageInfo)}
+     * {@link LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, LinkedMessageInfo)}
      * callback to every listener registered on the store, surfacing inbound channel posts on the
      * public listener surface.
      *
@@ -219,9 +219,9 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      * This implementation dispatches each callback on its own virtual thread so that a slow listener
      * cannot block the socket-stream dispatch loop or starve other listeners.
      *
-     * @param info the decoded {@link MessageInfo} to publish
+     * @param info the decoded {@link LinkedMessageInfo} to publish
      */
-    private void notifyNewMessage(MessageInfo info) {
+    private void notifyNewMessage(LinkedMessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
             if (listener instanceof NewMessageListener typed) {
                 Thread.startVirtualThread(() -> typed.onNewMessage(whatsapp, info));

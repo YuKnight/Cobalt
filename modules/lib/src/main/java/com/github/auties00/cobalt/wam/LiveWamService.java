@@ -2,33 +2,33 @@ package com.github.auties00.cobalt.wam;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.wam.binary.WamEventDecoder;
 import com.github.auties00.cobalt.wam.binary.WamEventEncoder;
 import com.github.auties00.cobalt.wam.binary.WamGlobalEncoder;
-import com.github.auties00.cobalt.wam.event.PsIdUpdateEventBuilder;
-import com.github.auties00.cobalt.wam.event.WamClientErrorsEventBuilder;
-import com.github.auties00.cobalt.wam.event.WamDroppedEventEvent;
-import com.github.auties00.cobalt.wam.event.WamDroppedEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.WamEventRegistry;
-import com.github.auties00.cobalt.wam.event.WebWamForceFlushEvent;
-import com.github.auties00.cobalt.wam.event.WebWamForceFlushEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PsIdUpdateEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WamClientErrorsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WamDroppedEventEvent;
+import com.github.auties00.cobalt.wire.wam.event.WamDroppedEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WamEventRegistry;
+import com.github.auties00.cobalt.wire.wam.event.WebWamForceFlushEvent;
+import com.github.auties00.cobalt.wire.wam.event.WebWamForceFlushEventBuilder;
 import com.github.auties00.cobalt.wam.model.WamChannel;
 import com.github.auties00.cobalt.wam.model.WamEventSpec;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsId;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsTokenIssuer;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsUploader;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.type.*;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 
 import java.lang.System.Logger.Level;
@@ -446,7 +446,7 @@ public class LiveWamService implements WamService {
      * (id {@code 17}).
      *
      * <p>It is the stringified
-     * {@link com.github.auties00.cobalt.model.device.pairing.ClientAppVersion}
+     * {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientAppVersion}
      * captured at {@link #initialize()}; mirrors WA Web's
      * {@code WAWebBuildConstants.VERSION_BASE_WITH_WINDOWS_BUILD}.
      */

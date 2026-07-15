@@ -9,14 +9,14 @@ import com.github.auties00.cobalt.calls.signaling.CallMessage;
 import com.github.auties00.cobalt.calls.signaling.session.OfferNoticeStanza;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallInteraction;
-import com.github.auties00.cobalt.model.call.CallLink;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
-import com.github.auties00.cobalt.model.call.CallState;
-import com.github.auties00.cobalt.model.call.IncomingCall;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallInteraction;
+import com.github.auties00.cobalt.wire.linked.call.CallLink;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.Set;
 

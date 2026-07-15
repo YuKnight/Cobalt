@@ -2,12 +2,12 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
@@ -59,7 +59,7 @@ class NewsletterMessageSenderTest {
                         .fromMe(true)
                         .build())
                 .serverId(1)
-                .message(MessageContainer.of("hello newsletter"))
+                .message(LinkedMessageContainer.of("hello newsletter"))
                 .build();
 
         var ack = sender.send(NEWSLETTER, info);
@@ -80,7 +80,7 @@ class NewsletterMessageSenderTest {
         assertFalse(stanza.getChild("participants").isPresent(),
                 "no <participants> wrapper on newsletter sends");
 
-        // The <plaintext> contains non-empty bytes (the serialised MessageContainer).
+        // The <plaintext> contains non-empty bytes (the serialised LinkedMessageContainer).
         var plaintext = stanza.getChild("plaintext").orElseThrow();
         assertTrue(plaintext.toContentBytes().orElseThrow().length > 0,
                 "plaintext payload must be non-empty");

@@ -9,8 +9,9 @@ import com.github.auties00.cobalt.calls.signaling.link.LinkJoinAck;
 import com.github.auties00.cobalt.calls.signaling.link.LinkJoinStanza;
 import com.github.auties00.cobalt.calls.signaling.link.LinkQueryAck;
 import com.github.auties00.cobalt.calls.signaling.link.LinkQueryStanza;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;
@@ -98,7 +99,7 @@ public final class CallLinkController {
         Objects.requireNonNull(token, "token cannot be null");
         Objects.requireNonNull(media, "media cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "querying call link {0}, media {1}, action {2}", Log.token(token), media, action);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "querying call link {0}, media {1}, action {2}", new LogRedactable.Token(token), media, action);
         setLinkState(CallLinkState.LINK_QUERY_SENT);
         var request = new LinkQueryStanza(token, media, Optional.of(action.wireValue()),
                 Optional.empty(), Optional.empty());
@@ -114,7 +115,7 @@ public final class CallLinkController {
      *
      * <p>Dispatches a {@code link_create} request carrying the media kind and the requested waiting room
      * gate, parses the reply into a {@link LinkCreateAck}, and returns it; the ack surfaces the minted token
-     * and composes to a {@link com.github.auties00.cobalt.model.call.CallLink} through
+     * and composes to a {@link com.github.auties00.cobalt.wire.linked.call.CallLink} through
      * {@link LinkCreateAck#toCallLink()}. Unlike {@link #query(String, CallLinkMedia, CallLinkQueryAction)}
      * and {@link #join(String, int)}, creating a link mints a standalone token rather than advancing a call
      * through the query and join handshake, so it does not touch the {@link CallLinkState} join
@@ -132,7 +133,7 @@ public final class CallLinkController {
         var request = LinkCreateStanza.of(media, waitingRoomEnabled);
         var reply = iqSender.sendForReply(request);
         var ack = LinkCreateAck.of(reply);
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created call link {0}", Log.token(ack.token()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created call link {0}", new LogRedactable.Token(ack.token()));
         return ack;
     }
 
@@ -183,7 +184,7 @@ public final class CallLinkController {
      */
     public LinkJoinAck join(String token, int joinState) {
         Objects.requireNonNull(token, "token cannot be null");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joining call link {0}, join state {1}", Log.token(token), joinState);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joining call link {0}, join state {1}", new LogRedactable.Token(token), joinState);
         setLinkState(CallLinkState.LINK_JOIN_SENT);
         var request = new LinkJoinStanza(token, joinState);
         var reply = iqSender.sendForReply(request);
@@ -206,7 +207,7 @@ public final class CallLinkController {
      */
     public LinkEditAck edit(String token, boolean waitingRoomEnabled) {
         Objects.requireNonNull(token, "token cannot be null");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "editing call link {0}, waiting room {1}", Log.token(token), waitingRoomEnabled);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "editing call link {0}, waiting room {1}", new LogRedactable.Token(token), waitingRoomEnabled);
         var request = LinkEditStanza.ofWaitingRoom(token, waitingRoomEnabled);
         var reply = iqSender.sendForReply(request);
         return LinkEditAck.of(reply);

@@ -2,13 +2,13 @@ package com.github.auties00.cobalt.calls.telemetry;
 
 import com.github.auties00.cobalt.calls.engine.context.CallContext;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallLog;
-import com.github.auties00.cobalt.model.call.CallLogBuilder;
-import com.github.auties00.cobalt.model.call.CallLogParticipantInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallLog;
+import com.github.auties00.cobalt.wire.linked.call.CallLogBuilder;
+import com.github.auties00.cobalt.wire.linked.call.CallLogParticipantInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.action.call.CallLogAction;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.factory.CallLogMutationFactory;
@@ -119,7 +119,7 @@ public final class CallLogSync {
      * the durations have been closed out on the context.
      *
      * @implNote This implementation runs the build and the local mirror unconditionally, then guards only
-     * the outbound {@link WebAppStateService#pushPatches(com.github.auties00.cobalt.model.sync.SyncPatchType, java.util.SequencedCollection)}
+     * the outbound {@link WebAppStateService#pushPatches(com.github.auties00.cobalt.wire.linked.sync.SyncPatchType, java.util.SequencedCollection)}
      * call, because the local table must reflect the just ended call even when the device is momentarily
      * unable to push (the {@code call_log} collection reruns the round once the socket recovers). The
      * caller JID resolution follows the native index key order: the call creator first, then the local

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.signaling;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 /**
  * Holds the shared wire constants and common header helper the call message payload records use.

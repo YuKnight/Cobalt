@@ -2,19 +2,19 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.sync.ConflictResolution;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.ClearChatActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ClearChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ClearChatActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.lang.System.Logger.Level;
@@ -25,13 +25,13 @@ import java.lang.System.Logger.Level;
  * <p>This handler drives the per-chat "Clear messages" action. When the user
  * clears a chat on another device, the server replays the resulting
  * {@link ClearChatAction} here, and the affected
- * {@link com.github.auties00.cobalt.model.chat.Chat} loses its message history
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat} loses its message history
  * while the chat row itself remains.
  *
  * @implNote
  * This implementation reduces WA Web's
  * {@code WAWebClearChatSync.$ClearChatSync$p_2} pipeline to a single
- * {@link com.github.auties00.cobalt.model.chat.Chat#removeMessages()}
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat#removeMessages()}
  * call. The
  * {@code deleteStarred} / {@code deleteMedia} / {@code skipMessages}
  * filters, the per-thread cleanup, the add-on cleanup, the AI-thread
@@ -92,7 +92,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * {@code ["clearChat", chatJid, deleteStarred, deleteMedia]} where
      * {@code deleteStarred} and {@code deleteMedia} are the wire strings
      * {@code "1"} or {@code "0"}, locates the target
-     * {@link com.github.auties00.cobalt.model.chat.Chat}, and drops its
+     * {@link com.github.auties00.cobalt.wire.linked.chat.Chat}, and drops its
      * messages. Returns {@link MutationApplicationResult#unsupported()} for
      * non-{@code SET} operations, an orphan result keyed by chat JID and model
      * type {@code "Chat"} when the chat is not in the store, malformed results

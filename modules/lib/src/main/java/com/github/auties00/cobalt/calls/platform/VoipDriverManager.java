@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.calls.platform.video.LiveVideoCaptureDriver.Ca
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.State;
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.VideoCaptureCapability;
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.VideoSink;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

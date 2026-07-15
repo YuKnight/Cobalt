@@ -6,10 +6,10 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.*;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.event.*;
+import com.github.auties00.cobalt.wire.wam.type.*;
 
 import java.io.File;
 import java.time.Duration;
@@ -231,7 +231,7 @@ public final class SyntheticBrowserPerfTelemetry {
      * byte-stable across reconnects and re-logins. When the device is not a
      * {@link Web} descriptor (for example a mobile one), a fresh coherent
      * fingerprint is sampled for the device platform through
-     * {@link Web#random(com.github.auties00.cobalt.model.device.pairing.ClientPlatformType)}.
+     * {@link Web#random(com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType)}.
      *
      * @return the persisted web descriptor, or a freshly sampled one when the
      *         device is not a {@link Web}

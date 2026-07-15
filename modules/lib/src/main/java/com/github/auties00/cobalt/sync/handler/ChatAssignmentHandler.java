@@ -2,16 +2,16 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatAssignmentBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.ChatAssignmentBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ChatAssignmentAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -81,7 +81,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
      * agent exists in the store (when non-empty), then either drops the
      * existing assignment for the chat (when the agent id is the empty string,
      * mirroring WA Web's unassign sentinel) or upserts a new
-     * {@link com.github.auties00.cobalt.model.chat.ChatAssignment}. The
+     * {@link com.github.auties00.cobalt.wire.linked.chat.ChatAssignment}. The
      * previous {@code opened} flag is preserved across the upsert so
      * reassignment does not reset the agent-opened indicator. Returns
      * {@link MutationApplicationResult#unsupported()} for non-{@code SET}

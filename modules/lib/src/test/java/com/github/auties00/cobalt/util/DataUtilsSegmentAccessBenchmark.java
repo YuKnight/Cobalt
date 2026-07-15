@@ -1,4 +1,6 @@
 package com.github.auties00.cobalt.util;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.RandomIdUtils;
 
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.signaling.link;
 
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;

@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.calls.signaling;
 
 import com.github.auties00.cobalt.calls.engine.participant.VideoStreamState;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
 
 import java.util.List;
 import java.util.function.BiFunction;

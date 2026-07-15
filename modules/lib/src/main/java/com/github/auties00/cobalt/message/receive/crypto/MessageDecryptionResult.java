@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * <p>The value is returned by {@link MessageDecryptionHandler#getResult()} after
  * iteration over every {@code <enc>} child finishes; it drives the follow-up branching
  * in {@link MessageReceiptHandler} (delivery receipt, retry, NACK, plain ack) and
- * decides whether the decoded {@link com.github.auties00.cobalt.model.chat.ChatMessageInfo}
+ * decides whether the decoded {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo}
  * is persisted.
  *
  * @implNote
@@ -28,7 +28,7 @@ public enum MessageDecryptionResult {
      * passed post-decryption validation.
      *
      * <p>Triggers a delivery receipt and persists the decoded
-     * {@link com.github.auties00.cobalt.model.chat.ChatMessageInfo}.
+     * {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgTypes.flow", exports = "E2EProcessResult",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -48,7 +48,7 @@ public enum MessageDecryptionResult {
     /**
      * Indicates the stanza marked the message as highly-structured but the decoded
      * protobuf did not carry an
-     * {@link com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage}, or
+     * {@link com.github.auties00.cobalt.wire.linked.message.text.HighlyStructuredMessage}, or
      * vice versa.
      *
      * <p>Triggers a silent drop: no receipt is sent because the mismatch is a
@@ -73,7 +73,7 @@ public enum MessageDecryptionResult {
 
     /**
      * Indicates the decrypted bytes could not be parsed as a
-     * {@link com.github.auties00.cobalt.model.message.MessageContainer} protobuf or
+     * {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer} protobuf or
      * carried an unrecognised content tag.
      *
      * <p>Triggers a NACK with the WhatsApp Web {@code NackReason.ParsingError} code.

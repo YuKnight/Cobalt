@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.engine.context;
 
-import com.github.auties00.cobalt.model.call.Call;
+import com.github.auties00.cobalt.wire.linked.call.Call;
 import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
 import com.github.auties00.cobalt.calls.engine.LifecycleController;
 

@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp.Pffft;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.A2nlsfBridge;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 

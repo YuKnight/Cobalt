@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.model.message.EmptyMessage;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.FutureProofMessageType;
-import com.github.auties00.cobalt.model.message.media.ImageMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.FutureProofMessage;
-import com.github.auties00.cobalt.model.message.system.FutureProofMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.EmptyMessage;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.FutureProofMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.FutureProofMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessageBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * Covers {@link MessageContainer} unwrapping across every
- * {@code FutureProofMessage} wrapper field: {@link MessageContainer#content()}
+ * Covers {@link LinkedMessageContainer} unwrapping across every
+ * {@code FutureProofMessage} wrapper field: {@link LinkedMessageContainer#content()}
  * must reach the innermost payload by reference while
- * {@link MessageContainer#futureProofContentType()} reports the outermost
+ * {@link LinkedMessageContainer#futureProofContentType()} reports the outermost
  * wrapper. The wrapper variants are driven from one shared
  * {@link MethodSource}, and empty wrappers are expected to fall back to the
  * {@link EmptyMessage} sentinel.
@@ -35,27 +35,27 @@ class FutureProofUnwrappingTest {
 
     static Stream<Arguments> wrappers() {
         return Stream.of(
-                wrapperArg(FutureProofMessageType.GROUP_MENTIONED, MessageContainerBuilder::groupMentionedMessage),
-                wrapperArg(FutureProofMessageType.DOCUMENT_WITH_CAPTION, MessageContainerBuilder::documentWithCaptionMessage),
-                wrapperArg(FutureProofMessageType.VIEW_ONCE, MessageContainerBuilder::viewOnceMessage),
-                wrapperArg(FutureProofMessageType.EPHEMERAL, MessageContainerBuilder::ephemeralMessage),
-                wrapperArg(FutureProofMessageType.EDITED, MessageContainerBuilder::editedMessage),
-                wrapperArg(FutureProofMessageType.BOT_INVOKE, MessageContainerBuilder::botInvokeMessage),
-                wrapperArg(FutureProofMessageType.LOTTIE_STICKER, MessageContainerBuilder::lottieStickerMessage),
-                wrapperArg(FutureProofMessageType.EVENT_COVER_IMAGE, MessageContainerBuilder::eventCoverImage),
-                wrapperArg(FutureProofMessageType.STATUS_MENTION, MessageContainerBuilder::statusMentionMessage),
-                wrapperArg(FutureProofMessageType.POLL_CREATION_OPTION_IMAGE, MessageContainerBuilder::pollCreationOptionImageMessage),
-                wrapperArg(FutureProofMessageType.ASSOCIATED_CHILD, MessageContainerBuilder::associatedChildMessage),
-                wrapperArg(FutureProofMessageType.GROUP_STATUS_MENTION, MessageContainerBuilder::groupStatusMentionMessage),
-                wrapperArg(FutureProofMessageType.POLL_CREATION, MessageContainerBuilder::pollCreationMessageV4),
-                wrapperArg(FutureProofMessageType.STATUS_ADD_YOURS, MessageContainerBuilder::statusAddYours),
-                wrapperArg(FutureProofMessageType.GROUP_STATUS, MessageContainerBuilder::groupStatusMessage),
-                wrapperArg(FutureProofMessageType.LIMIT_SHARING, MessageContainerBuilder::limitSharingMessage),
-                wrapperArg(FutureProofMessageType.BOT_TASK, MessageContainerBuilder::botTaskMessage),
-                wrapperArg(FutureProofMessageType.QUESTION, MessageContainerBuilder::questionMessage),
-                wrapperArg(FutureProofMessageType.BOT_FORWARDED, MessageContainerBuilder::botForwardedMessage),
-                wrapperArg(FutureProofMessageType.QUESTION_REPLY, MessageContainerBuilder::questionReplyMessage),
-                wrapperArg(FutureProofMessageType.NEWSLETTER_ADMIN_PROFILE, MessageContainerBuilder::newsletterAdminProfileMessage)
+                wrapperArg(FutureProofMessageType.GROUP_MENTIONED, LinkedMessageContainerBuilder::groupMentionedMessage),
+                wrapperArg(FutureProofMessageType.DOCUMENT_WITH_CAPTION, LinkedMessageContainerBuilder::documentWithCaptionMessage),
+                wrapperArg(FutureProofMessageType.VIEW_ONCE, LinkedMessageContainerBuilder::viewOnceMessage),
+                wrapperArg(FutureProofMessageType.EPHEMERAL, LinkedMessageContainerBuilder::ephemeralMessage),
+                wrapperArg(FutureProofMessageType.EDITED, LinkedMessageContainerBuilder::editedMessage),
+                wrapperArg(FutureProofMessageType.BOT_INVOKE, LinkedMessageContainerBuilder::botInvokeMessage),
+                wrapperArg(FutureProofMessageType.LOTTIE_STICKER, LinkedMessageContainerBuilder::lottieStickerMessage),
+                wrapperArg(FutureProofMessageType.EVENT_COVER_IMAGE, LinkedMessageContainerBuilder::eventCoverImage),
+                wrapperArg(FutureProofMessageType.STATUS_MENTION, LinkedMessageContainerBuilder::statusMentionMessage),
+                wrapperArg(FutureProofMessageType.POLL_CREATION_OPTION_IMAGE, LinkedMessageContainerBuilder::pollCreationOptionImageMessage),
+                wrapperArg(FutureProofMessageType.ASSOCIATED_CHILD, LinkedMessageContainerBuilder::associatedChildMessage),
+                wrapperArg(FutureProofMessageType.GROUP_STATUS_MENTION, LinkedMessageContainerBuilder::groupStatusMentionMessage),
+                wrapperArg(FutureProofMessageType.POLL_CREATION, LinkedMessageContainerBuilder::pollCreationMessageV4),
+                wrapperArg(FutureProofMessageType.STATUS_ADD_YOURS, LinkedMessageContainerBuilder::statusAddYours),
+                wrapperArg(FutureProofMessageType.GROUP_STATUS, LinkedMessageContainerBuilder::groupStatusMessage),
+                wrapperArg(FutureProofMessageType.LIMIT_SHARING, LinkedMessageContainerBuilder::limitSharingMessage),
+                wrapperArg(FutureProofMessageType.BOT_TASK, LinkedMessageContainerBuilder::botTaskMessage),
+                wrapperArg(FutureProofMessageType.QUESTION, LinkedMessageContainerBuilder::questionMessage),
+                wrapperArg(FutureProofMessageType.BOT_FORWARDED, LinkedMessageContainerBuilder::botForwardedMessage),
+                wrapperArg(FutureProofMessageType.QUESTION_REPLY, LinkedMessageContainerBuilder::questionReplyMessage),
+                wrapperArg(FutureProofMessageType.NEWSLETTER_ADMIN_PROFILE, LinkedMessageContainerBuilder::newsletterAdminProfileMessage)
         );
     }
 
@@ -65,9 +65,9 @@ class FutureProofUnwrappingTest {
     void wrapperUnwrapsToInner(FutureProofMessageType type, WrapperSetter setter) {
         var inner = new ImageMessageBuilder().caption("inner for " + type).build();
         var wrap = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder().imageMessage(inner).build())
+                .messageContainer(new LinkedMessageContainerBuilder().imageMessage(inner).build())
                 .build();
-        var builder = new MessageContainerBuilder();
+        var builder = new LinkedMessageContainerBuilder();
         setter.accept(builder, wrap);
         var container = builder.build();
 
@@ -82,9 +82,9 @@ class FutureProofUnwrappingTest {
     @DisplayName("every FutureProof wrapper with an empty inner falls back to EmptyMessage")
     void wrapperWithEmptyInnerFallsBack(FutureProofMessageType type, WrapperSetter setter) {
         var emptyWrap = new FutureProofMessageBuilder()
-                .messageContainer(MessageContainer.empty())
+                .messageContainer(LinkedMessageContainer.empty())
                 .build();
-        var builder = new MessageContainerBuilder();
+        var builder = new LinkedMessageContainerBuilder();
         setter.accept(builder, emptyWrap);
         var container = builder.build();
 
@@ -97,12 +97,12 @@ class FutureProofUnwrappingTest {
     void nestedWrappersUnwrap() {
         var inner = new ExtendedTextMessageBuilder().text("deeply nested").build();
         var view = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder().extendedTextMessage(inner).build())
+                .messageContainer(new LinkedMessageContainerBuilder().extendedTextMessage(inner).build())
                 .build();
         var ephemeral = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder().viewOnceMessage(view).build())
+                .messageContainer(new LinkedMessageContainerBuilder().viewOnceMessage(view).build())
                 .build();
-        var container = new MessageContainerBuilder().ephemeralMessage(ephemeral).build();
+        var container = new LinkedMessageContainerBuilder().ephemeralMessage(ephemeral).build();
 
         assertSame(inner, container.content(),
                 "double wrap (ephemeral -> viewOnce -> extendedText) must unwrap to innermost");
@@ -113,7 +113,7 @@ class FutureProofUnwrappingTest {
     @Test
     @DisplayName("container with no payload at all returns FutureProofMessageType.NONE")
     void noWrapperGivesNone() {
-        var container = MessageContainer.empty();
+        var container = LinkedMessageContainer.empty();
         assertEquals(FutureProofMessageType.NONE, container.futureProofContentType());
     }
 
@@ -121,7 +121,7 @@ class FutureProofUnwrappingTest {
     @DisplayName("container with a direct (non-wrapper) field returns NONE")
     void directFieldGivesNone() {
         var image = new ImageMessageBuilder().caption("direct").build();
-        var container = new MessageContainerBuilder().imageMessage(image).build();
+        var container = new LinkedMessageContainerBuilder().imageMessage(image).build();
         assertEquals(FutureProofMessageType.NONE, container.futureProofContentType(),
                 "imageMessage is a direct field, not a wrapper, so futureProofContentType is NONE");
     }
@@ -134,6 +134,6 @@ class FutureProofUnwrappingTest {
     }
 
     @FunctionalInterface
-    interface WrapperSetter extends BiConsumer<MessageContainerBuilder, FutureProofMessage> {
+    interface WrapperSetter extends BiConsumer<LinkedMessageContainerBuilder, FutureProofMessage> {
     }
 }

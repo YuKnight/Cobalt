@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.transport.subscription;
 
-import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptor;
-import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptors;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamDescriptor;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamDescriptors;
 
 import java.util.Objects;
 

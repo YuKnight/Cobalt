@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.bwe;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.io.DataInputStream;
 import java.io.EOFException;

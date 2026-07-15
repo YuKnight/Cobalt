@@ -3,13 +3,13 @@ package com.github.auties00.cobalt.message.send.stanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.BusinessHostStorageType;
-import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BusinessHostStorageType;
+import com.github.auties00.cobalt.wire.linked.business.BusinessVerifiedName;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
@@ -137,12 +137,12 @@ public final class BizStanza {
      * the payment-info native flow. Returns {@code null} for every other message shape, including other native flows and
      * non-interactive bodies.
      *
-     * @param container the outgoing {@link MessageContainer}
+     * @param container the outgoing {@link LinkedMessageContainer}
      * @return the {@code <biz>} {@link Stanza}, or {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public Stanza buildGroup(MessageContainer container) {
+    public Stanza buildGroup(LinkedMessageContainer container) {
         if (!(container.content() instanceof InteractiveMessage im)) {
             return null;
         }

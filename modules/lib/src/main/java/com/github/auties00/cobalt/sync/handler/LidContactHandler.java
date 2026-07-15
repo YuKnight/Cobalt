@@ -5,19 +5,20 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.mutation.OrphanMutationEntry;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.LidContactAction;
-import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.OrphanMutationEntry;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.LidContactAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.UserStatusMuteAction;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -140,7 +141,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact sync received non-lid jid {0}", Log.jid(lidJidString));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact sync received non-lid jid {0}", new LogRedactable.User(lidJidString));
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -218,7 +219,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
                 return;
             }
 
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact retrying {0} orphan status mutes for {1}", entries.size(), Log.jid(lidJidString));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact retrying {0} orphan status mutes for {1}", entries.size(), new LogRedactable.User(lidJidString));
 
             var applied = new ArrayList<OrphanMutationEntry>();
             for (var entry : entries) {
@@ -237,10 +238,10 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
             if (!applied.isEmpty()) {
                 client.store().syncStore().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
-                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact resolved {0} orphan status mutes for {1}", applied.size(), Log.jid(lidJidString));
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact resolved {0} orphan status mutes for {1}", applied.size(), new LogRedactable.User(lidJidString));
             }
         } catch (Exception e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "lid contact orphan status mutes retry failed for " + Log.jid(lidJidString), e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "lid contact orphan status mutes retry failed for " + new LogRedactable.User(lidJidString), e);
         }
     }
 }

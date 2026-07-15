@@ -4,9 +4,9 @@ import com.github.auties00.cobalt.calls.engine.participant.CallMembership;
 import com.github.auties00.cobalt.calls.transport.datachannel.AppDataController;
 import com.github.auties00.cobalt.calls.transport.RelayLatencyState;
 import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.List;
 import java.util.Objects;

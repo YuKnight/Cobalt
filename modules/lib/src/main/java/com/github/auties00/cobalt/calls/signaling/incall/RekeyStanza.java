@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.calls.signaling.incall;
 
-import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
-import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayloadSpec;
-import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyEntry;
-import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.E2eRekeyPayload;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.E2eRekeyPayloadSpec;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RekeyKeyEntry;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RekeyKeyType;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;

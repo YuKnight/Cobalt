@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.message.receipt;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 /**
  * Enumerates the receipt {@code type} values serialised into the {@code <receipt>} stanza

@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.message.send.crypto;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
@@ -9,10 +10,10 @@ import com.github.auties00.cobalt.message.receive.crypto.SenderKeyNameFactory;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -26,7 +27,7 @@ import java.util.Objects;
  * Encrypts outbound message protobufs into Signal envelopes for per-device fanout or group sender-key delivery.
  * <p>
  * This service is the sending counterpart of {@link MessageDecryption}: every outgoing
- * {@link com.github.auties00.cobalt.model.message.MessageContainer} that leaves the client passes through
+ * {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer} that leaves the client passes through
  * {@link #encryptForDevice(Jid, byte[])} for 1:1 and companion fanout, or through {@link #encryptForGroup(Jid, Jid, byte[])}
  * for SKMSG group delivery. It is held by the stanza-build pipeline as an injected service; embedders that speak Signal
  * directly do not normally call it.
@@ -117,7 +118,7 @@ public final class MessageEncryption {
     /**
      * Encrypts the given plaintext for a specific recipient device.
      * <p>
-     * The {@code plaintext} input is the protobuf-encoded {@link com.github.auties00.cobalt.model.message.MessageContainer}.
+     * The {@code plaintext} input is the protobuf-encoded {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer}.
      * The result is a {@link MessageEncryptionType#PKMSG} payload when the Signal session is freshly established and a
      * {@link MessageEncryptionType#MSG} payload once the recipient has decrypted at least one PKMSG. A thrown
      * {@link WhatsAppMessageException.Send.Unknown} aborts the per-device branch for that recipient; the caller decides
@@ -166,7 +167,7 @@ public final class MessageEncryption {
                 );
             } catch (Exception e) {
                 if (Log.WARNING) {
-                    LOGGER.log(Level.WARNING, "encryptMsgProtobuf: encryption fail for " + Log.jid(String.valueOf(recipientJid)), e);
+                    LOGGER.log(Level.WARNING, "encryptMsgProtobuf: encryption fail for " + new LogRedactable.User(String.valueOf(recipientJid)), e);
                 }
 
                 try {
@@ -176,7 +177,7 @@ public final class MessageEncryption {
                     }
                 } catch (Exception cleanupError) {
                     if (Log.WARNING) {
-                        LOGGER.log(Level.WARNING, "session cleanup failed for " + Log.jid(String.valueOf(recipientJid)), cleanupError);
+                        LOGGER.log(Level.WARNING, "session cleanup failed for " + new LogRedactable.User(String.valueOf(recipientJid)), cleanupError);
                     }
                 }
 
@@ -244,7 +245,7 @@ public final class MessageEncryption {
                 );
             } catch (Exception e) {
                 if (Log.WARNING) {
-                    LOGGER.log(Level.WARNING, "encryptMsgSenderKey: encryption fail for " + Log.jid(String.valueOf(groupJid)), e);
+                    LOGGER.log(Level.WARNING, "encryptMsgSenderKey: encryption fail for " + new LogRedactable.User(String.valueOf(groupJid)), e);
                 }
                 throw new WhatsAppMessageException.Send.Unknown(
                         "Failed to encrypt group message for group: " + groupJid, e

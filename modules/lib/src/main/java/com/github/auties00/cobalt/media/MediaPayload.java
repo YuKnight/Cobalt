@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -17,7 +17,7 @@ import java.util.Objects;
  *
  * <p>Bridges the per-format transcoder pipelines (image, sticker, audio,
  * voice note, video, document) and the upload layer
- * ({@link MediaConnectionService#upload(com.github.auties00.cobalt.model.media.MediaProvider, MediaPayload)}).
+ * ({@link MediaConnectionService#upload(com.github.auties00.cobalt.wire.linked.media.MediaProvider, MediaPayload)}).
  * Every payload reports its plaintext {@link #length()} up-front so the
  * upload layer can build a known-length {@link java.net.http.HttpRequest.BodyPublisher}
  * for the HTTP POST and runs a streaming encrypt-and-hash pass without ever

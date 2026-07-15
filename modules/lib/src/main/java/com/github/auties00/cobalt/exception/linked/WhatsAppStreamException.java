@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.exception.linked;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.Objects;
 

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.telemetry;
 
-import com.github.auties00.cobalt.model.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

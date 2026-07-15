@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
 
 import java.io.IOException;

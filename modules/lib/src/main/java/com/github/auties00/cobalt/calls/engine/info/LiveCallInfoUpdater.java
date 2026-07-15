@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.calls.engine.info;
 import com.github.auties00.cobalt.calls.engine.context.CallManager;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;

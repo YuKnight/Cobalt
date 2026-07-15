@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.message.send.id;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
@@ -21,7 +21,7 @@ import java.util.Objects;
  * <p>
  * The send pipeline calls {@link #generate(MessageIdVersion, Jid)} once per outgoing message; the returned string is the
  * wire identifier the server, the recipient, and every downstream acknowledgement use to refer to the message. Callers
- * that pass Cobalt a pre-built {@link com.github.auties00.cobalt.model.message.MessageKey} have already chosen an id and
+ * that pass Cobalt a pre-built {@link com.github.auties00.cobalt.wire.core.message.MessageKey} have already chosen an id and
  * do not invoke this class. Every id begins with {@value #PREFIX}; the suffix shape depends on the requested
  * {@link MessageIdVersion}.
  *

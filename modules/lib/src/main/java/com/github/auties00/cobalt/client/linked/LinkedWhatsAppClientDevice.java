@@ -3,9 +3,9 @@ package com.github.auties00.cobalt.client.linked;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
@@ -416,8 +416,8 @@ public sealed interface LinkedWhatsAppClientDevice permits LinkedWhatsAppClientD
         var body = Arrays.copyOfRange(serialized, 1, serialized.length);
         return switch (serialized[0]) {
             case Web.PROTO_TYPE_TAG -> LinkedWhatsAppClientDeviceWebSpec.decode(body);
-            case Desktop.PROTO_TYPE_TAG -> LinkedWhatsAppClientDeviceMobileSpec.decode(body);
-            case Mobile.PROTO_TYPE_TAG -> LinkedWhatsAppClientDeviceDesktopSpec.decode(body);
+            case Desktop.PROTO_TYPE_TAG -> LinkedWhatsAppClientDeviceDesktopSpec.decode(body);
+            case Mobile.PROTO_TYPE_TAG -> LinkedWhatsAppClientDeviceMobileSpec.decode(body);
             default -> throw new IllegalArgumentException("Unknown device discriminator: " + serialized[0]);
         };
     }

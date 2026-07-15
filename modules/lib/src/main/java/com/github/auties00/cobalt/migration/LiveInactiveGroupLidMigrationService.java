@@ -1,15 +1,16 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMetadata;
-import com.github.auties00.cobalt.model.chat.community.CommunityMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.community.CommunityMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
@@ -40,7 +41,7 @@ import java.util.Objects;
  * @implNote
  * This implementation diverges from WhatsApp Web's batched job in three ways.
  * First, queries are issued one-by-one through
- * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.model.jid.JidProvider)}
+ * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
  * instead of through a batched group-metadata query, because the per-chat
  * query is the only public Cobalt API. Second, the group membership check is
  * satisfied by the per-chat metadata gate (a group whose metadata is missing
@@ -194,7 +195,7 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
      * This implementation drops the AB-prop check WhatsApp Web's predecessor
      * used because the gating prop has been retired in the live bundle; only
      * the completion-state guard remains. Exceptions from individual
-     * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.model.jid.JidProvider)}
+     * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
      * calls are caught and logged so a single failure does not abort the whole
      * sweep, and the outer catch swallows everything.
      */
@@ -233,7 +234,7 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
                 } catch (Exception e) {
                     if (Log.WARNING) {
                         LOGGER.log(Level.WARNING,
-                                "inactive-group lid migration: metadata query failed for " + Log.jid(String.valueOf(groupJid)),
+                                "inactive-group lid migration: metadata query failed for " + new LogRedactable.User(String.valueOf(groupJid)),
                                 e);
                     }
                 }

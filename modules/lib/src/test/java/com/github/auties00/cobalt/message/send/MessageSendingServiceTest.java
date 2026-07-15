@@ -10,12 +10,12 @@ import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
@@ -28,9 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Covers the {@link MessageSendingService} validation and rejection branches:
- * a {@link com.github.auties00.cobalt.model.chat.ChatMessageInfo} to a
+ * a {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo} to a
  * newsletter JID and a
- * {@link com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo}
+ * {@link com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo}
  * to a non-newsletter JID both raise
  * {@link WhatsAppMessageException.Send.InvalidRecipient}; a missing
  * {@code messageId} or {@code parentJid} raises
@@ -50,7 +50,7 @@ class MessageSendingServiceTest {
     private static final Jid NEWSLETTER = Jid.of("120363402045452944@newsletter");
 
     @Test
-    @DisplayName("send(MessageInfo): ChatMessageInfo with a newsletter parent JID -> InvalidRecipient")
+    @DisplayName("send(LinkedMessageInfo): ChatMessageInfo with a newsletter parent JID -> InvalidRecipient")
     void chatMessageInfoToNewsletterFails() {
         var service = buildService();
         var info = new ChatMessageInfoBuilder()
@@ -59,7 +59,7 @@ class MessageSendingServiceTest {
                         .parentJid(NEWSLETTER)
                         .fromMe(true)
                         .build())
-                .message(MessageContainer.of("nope"))
+                .message(LinkedMessageContainer.of("nope"))
                 .build();
 
         assertThrows(WhatsAppMessageException.Send.InvalidRecipient.class,
@@ -68,7 +68,7 @@ class MessageSendingServiceTest {
     }
 
     @Test
-    @DisplayName("send(MessageInfo): NewsletterMessageInfo with a non-newsletter parent JID -> InvalidRecipient")
+    @DisplayName("send(LinkedMessageInfo): NewsletterMessageInfo with a non-newsletter parent JID -> InvalidRecipient")
     void newsletterMessageInfoToChatFails() {
         var service = buildService();
         var info = new NewsletterMessageInfoBuilder()
@@ -78,7 +78,7 @@ class MessageSendingServiceTest {
                         .fromMe(true)
                         .build())
                 .serverId(1)
-                .message(MessageContainer.of("nope"))
+                .message(LinkedMessageContainer.of("nope"))
                 .build();
 
         assertThrows(WhatsAppMessageException.Send.InvalidRecipient.class,
@@ -87,7 +87,7 @@ class MessageSendingServiceTest {
     }
 
     @Test
-    @DisplayName("send(MessageInfo): missing messageId on the key throws IllegalArgumentException")
+    @DisplayName("send(LinkedMessageInfo): missing messageId on the key throws IllegalArgumentException")
     void missingMessageIdThrows() {
         var service = buildService();
         var info = new ChatMessageInfoBuilder()
@@ -95,13 +95,13 @@ class MessageSendingServiceTest {
                         .parentJid(PEER_PN)
                         .fromMe(true)
                         .build())
-                .message(MessageContainer.of("hi"))
+                .message(LinkedMessageContainer.of("hi"))
                 .build();
         assertThrows(IllegalArgumentException.class, () -> service.send(info));
     }
 
     @Test
-    @DisplayName("send(MessageInfo): missing parentJid on the key throws IllegalArgumentException")
+    @DisplayName("send(LinkedMessageInfo): missing parentJid on the key throws IllegalArgumentException")
     void missingParentJidThrows() {
         var service = buildService();
         var info = new ChatMessageInfoBuilder()
@@ -109,7 +109,7 @@ class MessageSendingServiceTest {
                         .id("3EB0NOPARENT")
                         .fromMe(true)
                         .build())
-                .message(MessageContainer.of("hi"))
+                .message(LinkedMessageContainer.of("hi"))
                 .build();
         assertThrows(IllegalArgumentException.class, () -> service.send(info));
     }
@@ -140,17 +140,17 @@ class MessageSendingServiceTest {
     }
 
     @Test
-    @DisplayName("send(Jid, MessageContainer): null arguments throw NullPointerException")
+    @DisplayName("send(Jid, LinkedMessageContainer): null arguments throw NullPointerException")
     void sendNullArgs() {
         var service = buildService();
         assertThrows(NullPointerException.class,
-                () -> service.send(null, MessageContainer.of("hi")));
+                () -> service.send(null, LinkedMessageContainer.of("hi")));
         assertThrows(NullPointerException.class,
                 () -> service.send(PEER_PN, null));
     }
 
     @Test
-    @DisplayName("send(MessageInfo): null arg throws NullPointerException")
+    @DisplayName("send(LinkedMessageInfo): null arg throws NullPointerException")
     void sendInfoNullArg() {
         var service = buildService();
         assertThrows(NullPointerException.class, () -> service.send(null));
@@ -166,7 +166,7 @@ class MessageSendingServiceTest {
                         .parentJid(SELF_PN)
                         .fromMe(true)
                         .build())
-                .message(MessageContainer.of("peer payload"))
+                .message(LinkedMessageContainer.of("peer payload"))
                 .build();
         assertThrows(NullPointerException.class,
                 () -> service.sendPeer(null, info));

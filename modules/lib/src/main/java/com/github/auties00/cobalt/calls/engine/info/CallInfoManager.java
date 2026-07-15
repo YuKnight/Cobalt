@@ -7,7 +7,7 @@ import java.util.Optional;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 /**
  * Maintains the periodically updated immutable snapshot of one call's coarse information for listeners,

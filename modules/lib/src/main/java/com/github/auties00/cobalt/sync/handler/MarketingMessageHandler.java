@@ -5,14 +5,14 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.MarketingMessageBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.business.MarketingMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.MarketingMessageAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -32,7 +32,7 @@ import java.time.Instant;
  *
  * @implNote
  * This implementation persists each template eagerly through
- * {@link LinkedWhatsAppBusinessStore#putMarketingMessage(com.github.auties00.cobalt.model.business.MarketingMessage)}
+ * {@link LinkedWhatsAppBusinessStore#putMarketingMessage(com.github.auties00.cobalt.wire.linked.business.MarketingMessage)}
  * keyed by the template id, collapsing WA Web's two-stage bulk-create-or-merge
  * plus collection-add flow into a single map write because Cobalt's storage is
  * a flat key/value map. The {@link MarketingMessageAction#isDeleted()} flag is

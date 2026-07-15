@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.crypto;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

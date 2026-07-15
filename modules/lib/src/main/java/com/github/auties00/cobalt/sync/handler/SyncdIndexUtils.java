@@ -2,16 +2,17 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
@@ -38,7 +39,7 @@ import java.util.Optional;
  * The {@code WAWebSyncdResolveMessages.resolveMessagesForMutations} batch
  * pre-pass that consumes these helpers in WA Web has no Cobalt analogue;
  * Cobalt's handlers resolve their messages inline via
- * {@link LinkedWhatsAppChatStore#findChatByJid(com.github.auties00.cobalt.model.jid.JidProvider)}
+ * {@link LinkedWhatsAppChatStore#findChatByJid(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
  * so the AB-prop driven chunked-vs-sync branch and the IDB existence probe are
  * not replicated.
  */
@@ -370,7 +371,7 @@ public final class SyncdIndexUtils {
             remoteJid = Jid.of(remote);
         } catch (Exception e) {
             if (Log.WARNING)
-                LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid remote value={0}", Log.jid(remote));
+                LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid remote value={0}", new LogRedactable.User(remote));
             return Optional.empty();
         }
 
@@ -389,7 +390,7 @@ public final class SyncdIndexUtils {
                     participantJid = Jid.of(participant);
                 } catch (Exception e) {
                     if (Log.WARNING)
-                        LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid participant value={0}", Log.jid(participant));
+                        LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid participant value={0}", new LogRedactable.User(participant));
                     return Optional.empty();
                 }
             }

@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.sync.exchange;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValue;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.SyncActionEntry;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValue;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionEntry;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.util.List;
 

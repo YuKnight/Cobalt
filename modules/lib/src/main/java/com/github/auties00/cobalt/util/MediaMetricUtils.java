@@ -1,18 +1,20 @@
 package com.github.auties00.cobalt.util;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.RandomIdUtils;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.wam.event.WebcMediaErrorUnknownDetailsEventBuilder;
-import com.github.auties00.cobalt.wam.type.BackendStoreType;
-import com.github.auties00.cobalt.wam.type.MediaDownloadModeType;
-import com.github.auties00.cobalt.wam.type.MediaDownloadResultType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MediaUploadModeType;
-import com.github.auties00.cobalt.wam.type.MediaUploadResultType;
-import com.github.auties00.cobalt.wam.type.WebcMediaOperationCode;
+import com.github.auties00.cobalt.wire.wam.event.WebcMediaErrorUnknownDetailsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.BackendStoreType;
+import com.github.auties00.cobalt.wire.wam.type.MediaDownloadModeType;
+import com.github.auties00.cobalt.wire.wam.type.MediaDownloadResultType;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MediaUploadModeType;
+import com.github.auties00.cobalt.wire.wam.type.MediaUploadResultType;
+import com.github.auties00.cobalt.wire.wam.type.WebcMediaOperationCode;
 import com.github.auties00.cobalt.wam.WamService;
 
 import java.lang.System.Logger.Level;

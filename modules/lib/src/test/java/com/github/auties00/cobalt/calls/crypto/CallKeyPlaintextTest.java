@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.calls.crypto;
 
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.call.CallOfferMessage;
-import com.github.auties00.cobalt.model.message.call.CallOfferMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.call.CallOfferMessage;
+import com.github.auties00.cobalt.wire.linked.message.call.CallOfferMessageBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import com.github.auties00.cobalt.calls.CallKeySignalSeamTest;
  * {@link LiveCallKeyExchange#wrapCallKey(byte[])} hands to the Signal cipher and
  * {@link LiveCallKeyExchange#decryptCallKey} reads back.
  *
- * <p>The wrap is the protobuf {@code MessageContainer{Call{callKey}}}: field 10 ({@code Message.call})
+ * <p>The wrap is the protobuf {@code LinkedMessageContainer{Call{callKey}}}: field 10 ({@code Message.call})
  * wrapping field 1 ({@code Call.callKey}, 32 bytes). The live oracle is the group-rekey sample decrypted
  * from a real session in {@code re/calls2-spec/captures/group-rekey.json}: the post-unpad plaintext
  * {@code 52220a20d919...223e} decodes to call key {@code d919...223e}. These tests pin the model wrap
@@ -45,8 +45,8 @@ public class CallKeyPlaintextTest {
      */
     private static byte[] wrap(byte[] callKey) {
         var offer = new CallOfferMessageBuilder().callKey(callKey).build();
-        var container = new MessageContainerBuilder().call(offer).build();
-        return MessageContainerSpec.encode(container);
+        var container = new LinkedMessageContainerBuilder().call(offer).build();
+        return LinkedMessageContainerSpec.encode(container);
     }
 
     @Nested
@@ -55,7 +55,7 @@ public class CallKeyPlaintextTest {
         @Test
         @DisplayName("decodes the live plaintext to the captured 32-byte call key")
         public void decodesLiveSample() {
-            var container = MessageContainerSpec.decode(LIVE_PLAINTEXT);
+            var container = LinkedMessageContainerSpec.decode(LIVE_PLAINTEXT);
             var offer = assertInstanceOf(CallOfferMessage.class, container.content());
             assertTrue(offer.callKey().isPresent(), "decoded container must carry a call key");
             assertArrayEquals(LIVE_CALL_KEY, offer.callKey().orElseThrow());
@@ -82,7 +82,7 @@ public class CallKeyPlaintextTest {
                 key[i] = (byte) (0xA0 + i);
             }
             var encoded = wrap(key);
-            var container = MessageContainerSpec.decode(encoded);
+            var container = LinkedMessageContainerSpec.decode(encoded);
             var offer = assertInstanceOf(CallOfferMessage.class, container.content());
             assertArrayEquals(key, offer.callKey().orElseThrow());
         }

@@ -25,30 +25,31 @@ import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedCallOfferNoticeListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.message.MessageService;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallInteraction;
-import com.github.auties00.cobalt.model.call.CallLink;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
-import com.github.auties00.cobalt.model.call.CallState;
-import com.github.auties00.cobalt.model.call.IncomingCall;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallInteraction;
+import com.github.auties00.cobalt.wire.linked.call.CallLink;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.CallEventBuilder;
-import com.github.auties00.cobalt.wam.event.JoinableCallEventBuilder;
-import com.github.auties00.cobalt.wam.event.PreCallUserJourneyChatThreadEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.CallEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.JoinableCallEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PreCallUserJourneyChatThreadEventBuilder;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingActivity;
-import com.github.auties00.cobalt.wam.type.CallFromUi;
-import com.github.auties00.cobalt.wam.type.CallNetworkMedium;
-import com.github.auties00.cobalt.wam.type.CallResultType;
-import com.github.auties00.cobalt.wam.type.CallSide;
-import com.github.auties00.cobalt.wam.type.CallSizeType;
-import com.github.auties00.cobalt.wam.type.CallTransportType;
-import com.github.auties00.cobalt.wam.type.PreCallActionType;
-import com.github.auties00.cobalt.wam.type.SubSurface;
+import com.github.auties00.cobalt.wire.wam.type.CallFromUi;
+import com.github.auties00.cobalt.wire.wam.type.CallNetworkMedium;
+import com.github.auties00.cobalt.wire.wam.type.CallResultType;
+import com.github.auties00.cobalt.wire.wam.type.CallSide;
+import com.github.auties00.cobalt.wire.wam.type.CallSizeType;
+import com.github.auties00.cobalt.wire.wam.type.CallTransportType;
+import com.github.auties00.cobalt.wire.wam.type.PreCallActionType;
+import com.github.auties00.cobalt.wire.wam.type.SubSurface;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;
@@ -700,7 +701,7 @@ public final class LiveCallsService implements CallsService, CallLifecycleObserv
         Objects.requireNonNull(media, "media cannot be null");
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating call link, media={0}, waiting_room={1}", media, waitingRoomEnabled);
         var link = engine().createCallLink(media, waitingRoomEnabled);
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created call link {0}", Log.token(link.token()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created call link {0}", new LogRedactable.Token(link.token()));
         return link;
     }
 
@@ -1180,8 +1181,8 @@ public final class LiveCallsService implements CallsService, CallLifecycleObserv
      * {@link CallRuntime#stats()} accumulator, with the call's terminal {@link CallEndReason} mapped to a
      * {@link CallResultType}, and is committed through {@link WamService}. The completed call is also reported
      * to the ctlv2 thread logging aggregator through
-     * {@link LinkedWhatsAppClient#recordThreadActivity(com.github.auties00.cobalt.model.jid.JidProvider, ThreadLoggingActivity)}
-     * as a {@link ThreadLoggingActivity.Call} keyed by the call's {@link com.github.auties00.cobalt.model.call.Call#chatJid() chat JID},
+     * {@link LinkedWhatsAppClient#recordThreadActivity(com.github.auties00.cobalt.wire.core.jid.JidProvider, ThreadLoggingActivity)}
+     * as a {@link ThreadLoggingActivity.Call} keyed by the call's {@link com.github.auties00.cobalt.wire.linked.call.Call#chatJid() chat JID},
      * carrying the direction and connected duration. Any {@link RuntimeException} raised while building,
      * committing, or recording is swallowed so that telemetry never propagates a failure into the call path.
      *

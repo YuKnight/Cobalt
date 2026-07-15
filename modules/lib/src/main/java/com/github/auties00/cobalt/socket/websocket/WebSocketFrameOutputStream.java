@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket.websocket;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.io.FilterOutputStream;
 import java.io.IOException;

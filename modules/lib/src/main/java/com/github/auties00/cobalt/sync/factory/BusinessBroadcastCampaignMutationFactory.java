@@ -1,21 +1,21 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValue;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValue;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastCampaignAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.AudienceManagementEventBuilder;
-import com.github.auties00.cobalt.wam.type.AudienceEventSurfaceType;
-import com.github.auties00.cobalt.wam.type.AudienceManagementActionType;
-import com.github.auties00.cobalt.wam.type.AudiencePredicateTypeEnum;
-import com.github.auties00.cobalt.wam.type.AudienceResolutionTriggerType;
+import com.github.auties00.cobalt.wire.wam.event.AudienceManagementEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.AudienceEventSurfaceType;
+import com.github.auties00.cobalt.wire.wam.type.AudienceManagementActionType;
+import com.github.auties00.cobalt.wire.wam.type.AudiencePredicateTypeEnum;
+import com.github.auties00.cobalt.wire.wam.type.AudienceResolutionTriggerType;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -37,7 +37,7 @@ import java.util.Objects;
  *
  * <p>Every campaign mutation this factory builds manages the campaign's
  * audience (the targeted broadcast list), so each build commits an
- * {@link com.github.auties00.cobalt.wam.event.AudienceManagementEvent} (WAM id
+ * {@link com.github.auties00.cobalt.wire.wam.event.AudienceManagementEvent} (WAM id
  * {@code 7900}) describing the audience action, predicate, resolution trigger,
  * and a JSON descriptor of the affected campaign. WA Web only emits this beacon
  * from its {@code WAWebBizBroadcastAudienceRefreshJob} periodic resolver;
@@ -58,7 +58,7 @@ public final class BusinessBroadcastCampaignMutationFactory {
 
     /**
      * Holds the WAM telemetry service used to commit the
-     * {@link com.github.auties00.cobalt.wam.event.AudienceManagementEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.AudienceManagementEvent}
      * emitted whenever a campaign audience is set or removed.
      */
     private final WamService wamService;
@@ -181,7 +181,7 @@ public final class BusinessBroadcastCampaignMutationFactory {
     }
 
     /**
-     * Commits the {@link com.github.auties00.cobalt.wam.event.AudienceManagementEvent}
+     * Commits the {@link com.github.auties00.cobalt.wire.wam.event.AudienceManagementEvent}
      * (WAM id {@code 7900}) describing a change to a campaign's audience.
      *
      * <p>Both campaign mutations funnel through this helper: the SET path

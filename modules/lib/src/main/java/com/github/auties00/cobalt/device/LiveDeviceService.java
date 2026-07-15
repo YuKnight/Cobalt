@@ -18,38 +18,39 @@ import com.github.auties00.cobalt.device.key.DevicePreKeyHandler;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncQueryBuilder;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.stanza.usync.UsyncContext;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.stanza.usync.UsyncContext;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.linked.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppDeviceSyncException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.device.DeviceConstants;
-import com.github.auties00.cobalt.model.device.DeviceListMetadata;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
-import com.github.auties00.cobalt.model.device.info.*;
-import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.device.DeviceConstants;
+import com.github.auties00.cobalt.wire.linked.device.DeviceListMetadata;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentity;
+import com.github.auties00.cobalt.wire.linked.device.info.*;
+import com.github.auties00.cobalt.wire.linked.device.sync.PendingDeviceSync;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.*;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.AdvMetadataCreationFailureEventBuilder;
-import com.github.auties00.cobalt.wam.event.CoexPrivacySysMsgEventBuilder;
-import com.github.auties00.cobalt.wam.event.ContactSyncEventEventBuilder;
-import com.github.auties00.cobalt.wam.type.CoexSysMsgStateTransitionAttempt;
+import com.github.auties00.cobalt.wire.wam.event.AdvMetadataCreationFailureEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.CoexPrivacySysMsgEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ContactSyncEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.CoexSysMsgStateTransitionAttempt;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 
@@ -1054,7 +1055,7 @@ public final class LiveDeviceService implements DeviceService {
      * @implNote
      * This implementation hard-codes {@code 1300} to match {@code WAWebContactSyncErrorCodes.DEVICE_SYNC}
      * and duplicates the literal as a plain {@code int} because the matching value in
-     * {@link com.github.auties00.cobalt.wam.event.ContactSyncEventEvent#contactSyncErrorCode()}
+     * {@link com.github.auties00.cobalt.wire.wam.event.ContactSyncEventEvent#contactSyncErrorCode()}
      * is serialised as a raw integer on the wire.
      */
     private static final int CONTACT_SYNC_ERROR_CODE_DEVICE_SYNC = 1300;
@@ -1947,7 +1948,7 @@ public final class LiveDeviceService implements DeviceService {
      *
      * @implNote
      * This implementation pulls the participant roster via
-     * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.model.jid.JidProvider)}
+     * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
      * because Cobalt has no IDB-backed group cache; it then runs
      * {@link DeviceFanoutCalculator#calculate(Jid, Jid, Set, Jid)} with both me-device JIDs so the
      * {@code isMeDevice}/{@code isMeAccount} filter applies to both addressing-mode sides.
@@ -2004,7 +2005,7 @@ public final class LiveDeviceService implements DeviceService {
      * roster is supplied directly by the caller.
      *
      * <p>Broadcast lists carry their roster in the local
-     * {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList}
+     * {@link com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList}
      * record rather than in server-side group metadata, so the caller
      * passes the resolved recipient user JIDs explicitly instead of
      * having this method look them up.
@@ -2014,7 +2015,7 @@ public final class LiveDeviceService implements DeviceService {
      * (LID side preferred, matching WA Web's {@code getMaybeMeDeviceLid}) with
      * {@code shouldMergeAltDevices=true}, then runs the {@link DeviceFanoutCalculator} and
      * identity-change filter verbatim from {@link #getGroupFanout(Jid)}. It skips the
-     * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.model.jid.JidProvider)}
+     * {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
      * call, which has no counterpart for client-only audiences. This mirrors WA Web's
      * {@code encryptAndSendBroadcastMsg}, which resolves devices through
      * {@code getFanOutList({wids: [...recipients, meDevice], shouldMergeAltDevices: true})}.
@@ -2056,7 +2057,7 @@ public final class LiveDeviceService implements DeviceService {
      * (LID side preferred, matching WA Web's {@code getMaybeMeDeviceLid}) with
      * {@code shouldMergeAltDevices=true}, then runs the {@link DeviceFanoutCalculator} so the
      * sending device is dropped while the poster's own companion devices are retained. It performs
-     * no {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.model.jid.JidProvider)}
+     * no {@link LinkedWhatsAppClient#queryChatMetadata(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
      * call: a status has no group metadata to fetch.
      */
     @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
@@ -3046,7 +3047,7 @@ public final class LiveDeviceService implements DeviceService {
             response = client.sendNode(query);
         } catch (RuntimeException throwable) {
             if (Log.WARNING) {
-                LOGGER.log(Level.WARNING, "queryUserLid: cannot resolve LID for " + Log.jid(String.valueOf(user)), throwable);
+                LOGGER.log(Level.WARNING, "queryUserLid: cannot resolve LID for " + new LogRedactable.User(String.valueOf(user)), throwable);
             }
             return Optional.empty();
         }

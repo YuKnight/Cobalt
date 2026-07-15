@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.store.linked.protobuf;
 
 import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.mixin.PathMixin;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.mixin.PathMixin;
 import com.github.auties00.cobalt.store.linked.*;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

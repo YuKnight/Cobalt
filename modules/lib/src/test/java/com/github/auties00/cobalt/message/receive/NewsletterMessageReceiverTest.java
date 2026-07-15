@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.message.receive;
 
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Covers the Channels (newsletter) inbound path of {@link NewsletterMessageReceiver}: extraction of
  * the {@code id}, {@code t}, {@code server_id}, and {@code is_sender} attributes, decoding the
  * protobuf carried by the {@code <plaintext>} child, and stamping the resulting
- * {@link com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo} with
+ * {@link com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo} with
  * {@link MessageStatus#DELIVERED}. Synthetic inbound {@code <message>} nodes are driven through
  * {@link NewsletterMessageReceiver#receive(Stanza, Jid)} directly; the
  * receiver reads only the local JID from its
@@ -44,7 +44,7 @@ class NewsletterMessageReceiverTest {
     @DisplayName("receive: extracts id, t, server_id, status=DELIVERED and decodes the <plaintext> payload")
     void receivePlaintext() {
         var receiver = new NewsletterMessageReceiver(MessageFixtures.temporaryStore(SELF, null));
-        var payload = MessageContainerSpec.encode(MessageContainer.of("newsletter body"));
+        var payload = LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("newsletter body"));
 
         var inbound = new StanzaBuilder()
                 .description("message")
@@ -82,7 +82,7 @@ class NewsletterMessageReceiverTest {
     @DisplayName("receive: is_sender=\"true\" sets the resulting key.fromMe=true")
     void isSenderTrue() {
         var receiver = new NewsletterMessageReceiver(MessageFixtures.temporaryStore(SELF, null));
-        var payload = MessageContainerSpec.encode(MessageContainer.of("self post"));
+        var payload = LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("self post"));
 
         var inbound = new StanzaBuilder()
                 .description("message")
@@ -152,7 +152,7 @@ class NewsletterMessageReceiverTest {
                 .attribute("type", "text")
                 .content(new StanzaBuilder()
                         .description("plaintext")
-                        .content(MessageContainerSpec.encode(MessageContainer.of("hi")))
+                        .content(LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("hi")))
                         .build())
                 .build();
 
@@ -172,7 +172,7 @@ class NewsletterMessageReceiverTest {
                 .attribute("type", "text")
                 .content(new StanzaBuilder()
                         .description("plaintext")
-                        .content(MessageContainerSpec.encode(MessageContainer.of("hi")))
+                        .content(LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("hi")))
                         .build())
                 .build();
         assertThrows(NoSuchElementException.class,

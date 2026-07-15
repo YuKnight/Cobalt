@@ -2,31 +2,32 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingPreference;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingPreferenceBuilder;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingSetting;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.business.CtwaPerCustomerDataSharingAction;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaDataSharingPreference;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaDataSharingPreferenceBuilder;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaDataSharingSetting;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.CtwaPerCustomerDataSharingAction;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MmSignalEventBuilder;
-import com.github.auties00.cobalt.wam.event.MmSignalSharingVerificationEventEventBuilder;
-import com.github.auties00.cobalt.wam.event.SmbPerCustomerDataSharingControlEventBuilder;
-import com.github.auties00.cobalt.wam.type.ConsentSource;
-import com.github.auties00.cobalt.wam.type.MmDirectionFrom;
-import com.github.auties00.cobalt.wam.type.MmSignalType;
-import com.github.auties00.cobalt.wam.type.OnePdSignalNotSharedReason;
-import com.github.auties00.cobalt.wam.type.SignalSharingStatus;
-import com.github.auties00.cobalt.wam.type.SignalSurface;
-import com.github.auties00.cobalt.wam.type.SignalType;
-import com.github.auties00.cobalt.wam.type.SmbPerCustomerDataSharingControlAction;
-import com.github.auties00.cobalt.wam.type.SmbPerCustomerDataSharingControlEntryPoint;
+import com.github.auties00.cobalt.wire.wam.event.MmSignalEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MmSignalSharingVerificationEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.SmbPerCustomerDataSharingControlEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ConsentSource;
+import com.github.auties00.cobalt.wire.wam.type.MmDirectionFrom;
+import com.github.auties00.cobalt.wire.wam.type.MmSignalType;
+import com.github.auties00.cobalt.wire.wam.type.OnePdSignalNotSharedReason;
+import com.github.auties00.cobalt.wire.wam.type.SignalSharingStatus;
+import com.github.auties00.cobalt.wire.wam.type.SignalSurface;
+import com.github.auties00.cobalt.wire.wam.type.SignalType;
+import com.github.auties00.cobalt.wire.wam.type.SmbPerCustomerDataSharingControlAction;
+import com.github.auties00.cobalt.wire.wam.type.SmbPerCustomerDataSharingControlEntryPoint;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
@@ -195,7 +196,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
                         .accountLid(accountLid)
                         .enabled(enabled)
                         .build());
-                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: set lid={0} enabled={1}", Log.jid(accountLid), enabled);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: set lid={0} enabled={1}", new LogRedactable.User(accountLid), enabled);
 
                 if (previousEnabled == null || previousEnabled != enabled) {
                     logPerCustomerDataSharingStateChange(client, accountLid, enabled);
@@ -204,7 +205,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
                 return MutationApplicationResult.success();
             }
             case REMOVE -> {
-                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: remove lid={0}", Log.jid(accountLid));
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: remove lid={0}", new LogRedactable.User(accountLid));
                 client.store().businessStore().removeCtwaDataSharing(accountLid);
 
                 return MutationApplicationResult.success();
@@ -235,7 +236,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
         var globalEnabled = client.store().businessStore().ctwaDataSharingSetting()
                 .orElse(CtwaDataSharingSetting.NOT_SET) == CtwaDataSharingSetting.ENABLED;
         var optIn = enabled && globalEnabled;
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: committing telemetry lid={0} optIn={1}", Log.jid(accountLid), optIn);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: committing telemetry lid={0} optIn={1}", new LogRedactable.User(accountLid), optIn);
 
         commitControlEvent(optIn);
         commitSignalSharingVerificationEvent(accountLid, globalEnabled, optIn);

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.ack;
 
 import com.github.auties00.cobalt.calls.signaling.relay.RelayInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -19,7 +19,7 @@ import java.util.OptionalInt;
  * attributes. Other call-class ACK types ({@code accept}, {@code reject}, etc.) typically carry
  * no relay block.
  *
- * <p>The relay block is parsed into the calls2 {@link RelayInfo} model. That model carries the relay
+ * <p>The relay block is parsed into the calls {@link RelayInfo} model. That model carries the relay
  * authentication credentials as the list of {@code <auth_token id>} children through
  * {@link RelayInfo#authTokens()}, each referenced by a {@code <te2>} endpoint's {@code auth_token_id},
  * and it exposes the raw call-key and hop-by-hop key bytes through {@link RelayInfo#keyValue()} and

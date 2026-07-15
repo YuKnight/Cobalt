@@ -2,18 +2,18 @@ package com.github.auties00.cobalt.message.receipt;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
 
@@ -99,7 +99,7 @@ public final class MessageReceiptHandler {
      * Sends a delivery receipt for a successfully processed message, assuming the message
      * is active.
      * <p>
-     * Delegates to {@link #sendDeliveryReceipt(MessageReceiveStanza, MessageInfo, boolean)}
+     * Delegates to {@link #sendDeliveryReceipt(MessageReceiveStanza, LinkedMessageInfo, boolean)}
      * with the inactive-message flag set to {@code false}, which covers normal active-chat
      * deliveries where the inactive-chat fast path does not apply.
      *
@@ -108,7 +108,7 @@ public final class MessageReceiptHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgSendReceipt", exports = "sendReceipt",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public void sendDeliveryReceipt(MessageReceiveStanza stanza, MessageInfo info) {
+    public void sendDeliveryReceipt(MessageReceiveStanza stanza, LinkedMessageInfo info) {
         sendDeliveryReceipt(stanza, info, false);
     }
 
@@ -138,7 +138,7 @@ public final class MessageReceiptHandler {
             adaptation = WhatsAppAdaptation.DIRECT)
     @WhatsAppWebExport(moduleName = "WAWebSendDeliveryReceiptJob", exports = "sendDeliveryReceiptsAfterDecryption",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public void sendDeliveryReceipt(MessageReceiveStanza stanza, MessageInfo info, boolean hasInactiveMsg) {
+    public void sendDeliveryReceipt(MessageReceiveStanza stanza, LinkedMessageInfo info, boolean hasInactiveMsg) {
         var from = resolveFrom(stanza);
         var participant = resolveReceiptParticipant(stanza);
         var isSender = isSenderReceipt(from, participant);
@@ -304,7 +304,7 @@ public final class MessageReceiptHandler {
      * receipt rather than a normal delivery receipt.
      * <p>
      * The orchestrator uses this to choose between
-     * {@link #sendDeliveryReceipt(MessageReceiveStanza, MessageInfo)} and
+     * {@link #sendDeliveryReceipt(MessageReceiveStanza, LinkedMessageInfo)} and
      * {@link #sendBotInvokeResponseAck(MessageReceiveStanza)}; the predicate holds when the
      * chat is not on the bot server but the sender is.
      *

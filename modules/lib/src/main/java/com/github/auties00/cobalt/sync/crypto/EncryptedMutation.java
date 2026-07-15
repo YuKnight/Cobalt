@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.sync.crypto;
 
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.action.SyncActionDataBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionDataSpec;
-import com.github.auties00.cobalt.model.sync.action.SyncActionData;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionDataBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionDataSpec;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionData;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;

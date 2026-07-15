@@ -2,31 +2,31 @@ package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestMessageSyncDCollectionFatalRecoveryRequestBuilder;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestResponseMessage;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestType;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;
-import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecoverySpec;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestMessageSyncDCollectionFatalRecoveryRequestBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestType;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdSnapshotRecovery;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdSnapshotRecoverySpec;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilder;
-import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
+import com.github.auties00.cobalt.wire.wam.event.NonMessagePeerDataRequestEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.PeerDataRequestType;
 
 import java.io.ByteArrayInputStream;
 import java.lang.System.Logger.Level;
@@ -249,10 +249,10 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
      *
      * <p>The request is wrapped in a {@link ProtocolMessage} of type
      * {@link ProtocolMessage.Type#PEER_DATA_OPERATION_REQUEST_MESSAGE} and a
-     * {@link com.github.auties00.cobalt.model.message.MessageContainer} before
+     * {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer} before
      * being sent via {@link LinkedWhatsAppClient#sendPeerMessage}. Per-request
      * telemetry is committed through {@link WamService#commit} as a
-     * {@link com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.NonMessagePeerDataRequestEvent}
      * keyed on the outbound peer-message id.
      *
      * @implNote This implementation performs the message wrapping inline
@@ -284,7 +284,7 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
                 .peerDataOperationRequestMessage(requestMessage)
                 .build();
 
-        var messageContainer = new MessageContainerBuilder()
+        var messageContainer = new LinkedMessageContainerBuilder()
                 .protocolMessage(protocolMessage)
                 .build();
 

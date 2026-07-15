@@ -6,20 +6,20 @@ import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.linked.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppOwnDeviceListExpiredException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
-import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.stanza.usync.UsyncContext;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceList;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceListBuilder;
+import com.github.auties00.cobalt.wire.linked.device.sync.PendingDeviceSync;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.wire.stanza.usync.UsyncContext;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.AdvStoredTimestampExpiredEventBuilder;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;
@@ -177,7 +177,7 @@ public final class DeviceADVChecker implements AutoCloseable {
      * <p>On the first ever invocation (no previous check time) this records the timestamp and
      * returns immediately, matching WA Web's no-op first run. Subsequent ticks read the two
      * expiration AB props, classify cached lists via {@link #analyzeDeviceLists}, emit one
-     * {@link com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEvent} per expired list,
+     * {@link com.github.auties00.cobalt.wire.wam.event.AdvStoredTimestampExpiredEvent} per expired list,
      * log the local user out when self-expired and the AB prop agrees, clear expired records, and
      * queue proactive USyncs for the rest. The check time is updated in a {@code finally} block so
      * it advances even when the body throws.
@@ -367,7 +367,7 @@ public final class DeviceADVChecker implements AutoCloseable {
     }
 
     /**
-     * Emits one {@link com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEvent} WAM
+     * Emits one {@link com.github.auties00.cobalt.wire.wam.event.AdvStoredTimestampExpiredEvent} WAM
      * event per expired device list, reporting overshoot in hours.
      *
      * <p>The overshoot of each list is computed as {@code now - (timestamp + expiryThreshold)};

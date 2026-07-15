@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueSpec;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignAction.Status;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueSpec;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastCampaignAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastCampaignAction.Status;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastCampaignActionBuilder;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.wam.TestWamService;
 import org.junit.jupiter.api.BeforeEach;

@@ -3,36 +3,37 @@ package com.github.auties00.cobalt.sync.exchange;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.media.ExternalBlobReference;
-import com.github.auties00.cobalt.model.media.ExternalBlobReferenceBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionEntry;
-import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.*;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReference;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReferenceBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyData;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyId;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.signal.KeyIdBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionEntry;
+import com.github.auties00.cobalt.wire.linked.sync.SyncCollectionMetadata;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.*;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.*;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MediaUpload2EventBuilder;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MediaUploadModeType;
-import com.github.auties00.cobalt.wam.type.MediaUploadResultType;
-import com.github.auties00.cobalt.wam.type.UploadOriginType;
+import com.github.auties00.cobalt.wire.wam.event.MediaUpload2EventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MediaUploadModeType;
+import com.github.auties00.cobalt.wire.wam.type.MediaUploadResultType;
+import com.github.auties00.cobalt.wire.wam.type.UploadOriginType;
 
 import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
@@ -284,7 +285,7 @@ public final class MutationRequestBuilder {
             for (var patch : patches) {
                 if (patch.mutation().operation() == SyncdOperation.REMOVE
                         && !storedIndices.contains(patch.mutation().index())) {
-                    if (Log.WARNING) LOGGER.log(Level.WARNING, "dropping orphaned remove mutation for collection {0}, action {1}", patchType, Log.secret(patch.mutation().index()));
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "dropping orphaned remove mutation for collection {0}, action {1}", patchType, new LogRedactable.Secret(patch.mutation().index()));
                     continue;
                 }
                 filteredPatches.add(patch);
@@ -453,7 +454,7 @@ public final class MutationRequestBuilder {
             if (mutation.operation() == SyncdOperation.REMOVE) {
                 var originalEntry = whatsapp.store().syncStore().findSyncActionEntryByActionIndex(patchType, mutation.index())
                         .orElseThrow(() -> {
-                            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot find original key for remove operation on index {0} in {1}", Log.secret(mutation.index()), patchType);
+                            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot find original key for remove operation on index {0} in {1}", new LogRedactable.Secret(mutation.index()), patchType);
                             return new IllegalStateException(
                                     "Cannot find original key for REMOVE operation on index: " + mutation.index()
                             );
@@ -715,7 +716,7 @@ public final class MutationRequestBuilder {
      * @implNote
      * This implementation collapses WA Web's separate upload-manager call (with explicit
      * {@code type: "md-app-state"}, {@code uploadOrigin: UNKNOWN}, and similar parameters) into a
-     * single {@link MediaConnectionService#upload(com.github.auties00.cobalt.model.media.MediaProvider,
+     * single {@link MediaConnectionService#upload(com.github.auties00.cobalt.wire.linked.media.MediaProvider,
      * MediaPayload)} which encrypts, uploads, and populates the {@link ExternalBlobReference}
      * fields in one round trip.
      *

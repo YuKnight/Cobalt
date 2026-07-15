@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.ack;
 
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.time.Instant;
 import java.util.Optional;

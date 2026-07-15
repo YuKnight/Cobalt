@@ -2,11 +2,11 @@ package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppLidMigrationException;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMapping;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingBuilder;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMapping;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingBuilder;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers {@link LidMigrationService#processProtocolMessage(com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayload)}:
+ * Covers {@link LidMigrationService#processProtocolMessage(com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayload)}:
  * every observable side effect of the primary-device mapping-sync ingestion, including
  * state-machine gating, primary cache population, mapping-sync timeout cancellation, per-contact
  * LID mirroring, and the auto-start of {@link LidMigrationService#executeMigration()}. Each case

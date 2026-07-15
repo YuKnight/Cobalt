@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.message;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.receive.LiveMessageReceivingService;
@@ -13,11 +13,11 @@ import com.github.auties00.cobalt.message.send.LiveMessageSendingService;
 import com.github.auties00.cobalt.message.send.MessageSendingService;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 
@@ -69,7 +69,7 @@ public final class LiveMessageService implements MessageService {
 
     /**
      * Holds the inbound pipeline owning stanza parsing, Signal decryption, and
-     * {@link MessageInfo} construction.
+     * {@link LinkedMessageInfo} construction.
      */
     private final MessageReceivingService receivingService;
 
@@ -138,12 +138,12 @@ public final class LiveMessageService implements MessageService {
     }
 
     @Override
-    public AckResult send(Jid chatJid, MessageContainer container) {
+    public AckResult send(Jid chatJid, LinkedMessageContainer container) {
         return sendingService.send(chatJid, container);
     }
 
     @Override
-    public AckResult send(MessageInfo messageInfo) {
+    public AckResult send(LinkedMessageInfo messageInfo) {
         return sendingService.send(messageInfo);
     }
 
@@ -153,7 +153,7 @@ public final class LiveMessageService implements MessageService {
     }
 
     @Override
-    public MessageInfo process(Stanza stanza) {
+    public LinkedMessageInfo process(Stanza stanza) {
         return receivingService.process(stanza);
     }
 

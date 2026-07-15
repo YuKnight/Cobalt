@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.activation.ApnsActivationCrypto;
 import com.github.auties00.cobalt.registration.push.apns.activation.ApnsActivationInfo;
 import com.github.auties00.cobalt.registration.push.apns.plist.Plist;

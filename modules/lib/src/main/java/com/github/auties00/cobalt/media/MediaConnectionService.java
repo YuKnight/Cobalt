@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.media;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.model.media.MediaPath;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.media.MediaPath;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.io.InputStream;
 import java.util.SequencedCollection;

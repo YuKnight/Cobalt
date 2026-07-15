@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.calls.engine.participant.VideoStreamState;
 import com.github.auties00.cobalt.calls.engine.event.CallEvent;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.datachannel.ReactionInfo;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.ReactionInfo;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

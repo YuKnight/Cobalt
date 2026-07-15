@@ -3,47 +3,47 @@ package com.github.auties00.cobalt.quarantine;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.listener.linked.LinkedMessageQuarantinedListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.QuarantinedMessageBuilder;
-import com.github.auties00.cobalt.model.message.call.CallLogMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.interactive.TemplateButton;
-import com.github.auties00.cobalt.model.message.interactive.TemplateMessage;
-import com.github.auties00.cobalt.model.message.location.LiveLocationMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.AlbumMessage;
-import com.github.auties00.cobalt.model.message.media.AudioMessage;
-import com.github.auties00.cobalt.model.message.media.DocumentMessage;
-import com.github.auties00.cobalt.model.message.media.ImageMessage;
-import com.github.auties00.cobalt.model.message.media.StickerMessage;
-import com.github.auties00.cobalt.model.message.media.VideoMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.system.KeepInChatMessage;
-import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.privacy.DefenseModePrivacyValue;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.Message;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.QuarantinedMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.call.CallLogMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.TemplateButton;
+import com.github.auties00.cobalt.wire.linked.message.interactive.TemplateMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LiveLocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.AlbumMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.AudioMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.DocumentMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.StickerMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.VideoMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.KeepInChatMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.PinInChatMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.HighlyStructuredMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.privacy.DefenseModePrivacyValue;
+import com.github.auties00.cobalt.wire.linked.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.DefenseModeQuarantineEventBuilder;
-import com.github.auties00.cobalt.wam.type.DefenseModeQuarantineAction;
+import com.github.auties00.cobalt.wire.wam.event.DefenseModeQuarantineEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.DefenseModeQuarantineAction;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;
@@ -54,7 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Production {@link QuarantineService} backed by a {@link LinkedWhatsAppClient}.
  *
  * @implNote
- * This implementation classifies {@link MessageContainer#content()} (the envelope-unwrapped
+ * This implementation classifies {@link LinkedMessageContainer#content()} (the envelope-unwrapped
  * message) rather than re-deriving WA Web's separate {@code maybeGetFutureproofMessage} pass:
  * because {@code content()} already unwraps every view-once, ephemeral and futureproof layer to
  * the innermost displayable message, classifying it yields the same result as WA Web's
@@ -110,7 +110,7 @@ public final class LiveQuarantineService implements QuarantineService {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuarantineActionUtils", exports = "getQuarantineAction", adaptation = WhatsAppAdaptation.ADAPTED)
-    public QuarantineAction getQuarantineAction(MessageContainer message, Jid sender) {
+    public QuarantineAction getQuarantineAction(LinkedMessageContainer message, Jid sender) {
         if (message == null
                 || !abPropsService.getBool(ABProp.DEFENSE_MODE_QUARANTINE)
                 || !isDefenseModeActive()
@@ -131,7 +131,7 @@ public final class LiveQuarantineService implements QuarantineService {
             return false;
         }
         info.setQuarantinedMessage(new QuarantinedMessageBuilder()
-                .originalData(MessageContainerSpec.encode(info.message()))
+                .originalData(LinkedMessageContainerSpec.encode(info.message()))
                 .extractedText(action.extractedText().orElse(null))
                 .build());
         quarantinedKeys.add(info.key());

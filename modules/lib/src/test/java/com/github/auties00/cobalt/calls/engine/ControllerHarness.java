@@ -5,10 +5,10 @@ import com.github.auties00.cobalt.calls.crypto.CallRekeyEnvelope;
 import com.github.auties00.cobalt.calls.platform.VoipHostApi;
 import com.github.auties00.cobalt.calls.signaling.session.CallKeyDistribution;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -381,7 +381,7 @@ final class ControllerHarness {
                                boolean video, int participantCount,
                                com.github.auties00.cobalt.calls.engine.participant.CallMembership membership,
                                MediaStreams streams,
-                               com.github.auties00.cobalt.model.jid.Jid peerDeviceJid,
+                               com.github.auties00.cobalt.wire.core.jid.Jid peerDeviceJid,
                                Optional<String> electedRelayName,
                                com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener listener) {
             var session = new RecordingSession(callId);

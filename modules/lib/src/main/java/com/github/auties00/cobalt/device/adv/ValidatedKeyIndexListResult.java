@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.device.adv;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVEncryptionType;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -23,7 +23,7 @@ import java.util.SequencedSet;
  * end-to-end encrypted accounts from hosted business-coexistence accounts, and the
  * {@link #timestamp() timestamp} / {@link #rawId() rawId} pair that detects identity rotation.
  *
- * @see DeviceADVValidator#decodeSignedKeyIndexBytes(com.github.auties00.cobalt.model.jid.Jid, byte[])
+ * @see DeviceADVValidator#decodeSignedKeyIndexBytes(com.github.auties00.cobalt.wire.core.jid.Jid, byte[])
  * @see DeviceADVValidator#verifySKeyIndexWithAccSigKey(byte[])
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleAdvDeviceNotificationUtils")

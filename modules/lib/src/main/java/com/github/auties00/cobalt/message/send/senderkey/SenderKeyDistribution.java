@@ -3,19 +3,20 @@ package com.github.auties00.cobalt.message.send.senderkey;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
-import com.github.auties00.cobalt.model.message.system.DeviceSentMessageBuilder;
-import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessageBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.system.DeviceSentMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.DeviceSentMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.group.SenderKeyDistributionMessageBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
@@ -145,7 +146,7 @@ public final class SenderKeyDistribution {
                 .groupJid(groupJid)
                 .axolotlSenderKeyDistributionMessage(senderKeyBytes)
                 .build();
-        var baseContainer = MessageContainer.of(skDistMessage);
+        var baseContainer = LinkedMessageContainer.of(skDistMessage);
 
         var protosByUser = generateMsgProtobufs(
                 baseContainer, devices, shouldWrapDsm, groupJid, phash);
@@ -155,12 +156,12 @@ public final class SenderKeyDistribution {
             try {
                 var userKey = device.toUserJid();
                 var proto = protosByUser.getOrDefault(userKey, baseContainer);
-                var plaintext = MessageContainerSpec.encode(proto);
+                var plaintext = LinkedMessageContainerSpec.encode(proto);
                 var payload = encryption.encryptForDevice(device, plaintext);
                 results.add(payload);
             } catch (Exception e) {
                 if (Log.WARNING) {
-                    LOGGER.log(Level.WARNING, "getKeyDistributionMsg: encryption fail for " + Log.jid(String.valueOf(device)), e);
+                    LOGGER.log(Level.WARNING, "getKeyDistributionMsg: encryption fail for " + new LogRedactable.User(String.valueOf(device)), e);
                 }
                 if (isPrimaryDevice(device)) {
                     throw new WhatsAppMessageException.Send.Unknown(
@@ -197,7 +198,7 @@ public final class SenderKeyDistribution {
     @WhatsAppWebExport(moduleName = "WAWebDeviceSentMessageProtoUtils", exports = "wrapDeviceSentMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MessageEncryptedPayload> encryptCompanionDsmPhash(
-            MessageContainer message,
+            LinkedMessageContainer message,
             Collection<Jid> companionDevices,
             String phash,
             Jid groupJid
@@ -221,10 +222,10 @@ public final class SenderKeyDistribution {
                 .messageContainer(message)
                 .phash(phash)
                 .build();
-        var dsmContainer = MessageContainer.of(dsm);
+        var dsmContainer = LinkedMessageContainer.of(dsm);
 
         var enriched = IcdcEnricher.enrich(dsmContainer, senderIcdc, null);
-        var plaintext = MessageContainerSpec.encode(enriched);
+        var plaintext = LinkedMessageContainerSpec.encode(enriched);
 
         var results = new ArrayList<MessageEncryptedPayload>(companionDevices.size());
         for (var device : companionDevices) {
@@ -233,7 +234,7 @@ public final class SenderKeyDistribution {
                 results.add(payload);
             } catch (Exception e) {
                 if (Log.WARNING) {
-                    LOGGER.log(Level.WARNING, "getCompanionDsmPhashMsg: encryption fail for " + Log.jid(String.valueOf(device)), e);
+                    LOGGER.log(Level.WARNING, "getCompanionDsmPhashMsg: encryption fail for " + new LogRedactable.User(String.valueOf(device)), e);
                 }
             }
         }
@@ -260,8 +261,8 @@ public final class SenderKeyDistribution {
             adaptation = WhatsAppAdaptation.DIRECT)
     @WhatsAppWebExport(moduleName = "WAWebDeviceSentMessageProtoUtils", exports = "wrapDeviceSentMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private Map<Jid, MessageContainer> generateMsgProtobufs(
-            MessageContainer baseContainer,
+    private Map<Jid, LinkedMessageContainer> generateMsgProtobufs(
+            LinkedMessageContainer baseContainer,
             Collection<Jid> devices,
             boolean shouldWrapDsm,
             Jid groupJid,
@@ -279,12 +280,12 @@ public final class SenderKeyDistribution {
                 .distinct()
                 .toList();
 
-        var result = new HashMap<Jid, MessageContainer>(uniqueUsers.size());
+        var result = new HashMap<Jid, LinkedMessageContainer>(uniqueUsers.size());
 
         for (var userJid : uniqueUsers) {
             var isSelf = selfJid != null && userJid.equals(selfJid.toUserJid());
 
-            MessageContainer proto;
+            LinkedMessageContainer proto;
 
             IcdcResult recipientIcdc = null;
             if (isSelf) {
@@ -295,7 +296,7 @@ public final class SenderKeyDistribution {
                     if (phash != null) {
                         dsmBuilder.phash(phash);
                     }
-                    proto = MessageContainer.of(dsmBuilder.build());
+                    proto = LinkedMessageContainer.of(dsmBuilder.build());
                 } else {
                     proto = baseContainer;
                 }

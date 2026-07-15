@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
 import com.github.auties00.cobalt.calls.media.sframe.SFrameKeyProvider;
 import com.github.auties00.cobalt.calls.signaling.group.GroupInfoStanza;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -709,7 +709,7 @@ public final class CallMembership {
      * primary SSRCs, the values {@link CallSecureSsrcGenerator} derived from the call id and the member's
      * active device JID during the upsert), and returns them as a {@link PeerStreamSsrcs} tuple. The list
      * preserves slot order, so the positional index of a peer in the returned list is the index the fused
-     * {@code 0x4024} {@link com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions} matrix
+     * {@code 0x4024} {@link com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptions} matrix
      * tags that peer's entries with. A peer whose audio SSRC has not been derived (no active device pinned
      * yet) is skipped, since it carries no receive layout to subscribe to. Self is excluded because it is the
      * matrix's leading entry that carries no participant, sourced from the local send layout rather than the

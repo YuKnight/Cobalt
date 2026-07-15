@@ -2,9 +2,9 @@ package com.github.auties00.cobalt.calls.engine.context;
 
 import com.github.auties00.cobalt.calls.signaling.CallMessage;
 import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.IncomingCall;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;

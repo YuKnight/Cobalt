@@ -3,9 +3,9 @@ package com.github.auties00.cobalt.media.transcode;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
 
 import java.io.InputStream;
 import java.nio.file.Path;

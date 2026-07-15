@@ -2,32 +2,33 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadataEditBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataEditBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
-import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
-import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.model.contact.Contact;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.UserStatusMuteAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.UserStatusMuteActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.StatusMuteEvent;
-import com.github.auties00.cobalt.wam.event.StatusMuteEventBuilder;
-import com.github.auties00.cobalt.wam.type.MuteAction;
-import com.github.auties00.cobalt.wam.type.MuteOrigin;
-import com.github.auties00.cobalt.wam.type.StatusCategory;
-import com.github.auties00.cobalt.wam.type.StatusPosterContactType;
+import com.github.auties00.cobalt.wire.wam.event.StatusMuteEvent;
+import com.github.auties00.cobalt.wire.wam.event.StatusMuteEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MuteAction;
+import com.github.auties00.cobalt.wire.wam.type.MuteOrigin;
+import com.github.auties00.cobalt.wire.wam.type.StatusCategory;
+import com.github.auties00.cobalt.wire.wam.type.StatusPosterContactType;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -111,7 +112,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}. The second index slot must parse as a valid
      * {@link Jid} and the decoded value must be a {@link UserStatusMuteAction}, otherwise the
      * mutation is reported as malformed. Group JIDs route through
-     * {@link LinkedWhatsAppChatStore#applyGroupMetadataEdit(Jid, com.github.auties00.cobalt.model.chat.group.GroupMetadataEdit)};
+     * {@link LinkedWhatsAppChatStore#applyGroupMetadataEdit(Jid, com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataEdit)};
      * user JIDs route through {@link Contact#setStatusMuted(boolean)}
      * on the resolved contact. An unknown group or contact surfaces as
      * {@link MutationApplicationResult#orphan(String, String)} with the model type
@@ -149,7 +150,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
         try {
             wid = Jid.of(widString);
         } catch (RuntimeException e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "user status mute: invalid wid={0}", Log.jid(widString));
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "user status mute: invalid wid={0}", new LogRedactable.User(widString));
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 

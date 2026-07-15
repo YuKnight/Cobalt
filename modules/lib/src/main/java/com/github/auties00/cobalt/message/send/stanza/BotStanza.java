@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
@@ -8,14 +9,14 @@ import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
@@ -112,13 +113,13 @@ public final class BotStanza {
         }
         protobufTransform.transformForBot(container);
 
-        var plaintext = MessageContainerSpec.encode(container);
+        var plaintext = LinkedMessageContainerSpec.encode(container);
         MessageEncryptedPayload payload;
         try {
             payload = encryption.encryptForDevice(botJid, plaintext);
         } catch (Exception e) {
             if (Log.WARNING) {
-                LOGGER.log(Level.WARNING, "bot encryption failed for " + Log.jid(String.valueOf(botJid)), e);
+                LOGGER.log(Level.WARNING, "bot encryption failed for " + new LogRedactable.User(String.valueOf(botJid)), e);
             }
             return null;
         }
@@ -246,7 +247,7 @@ public final class BotStanza {
         protobufTransform.transformForCapi(container, botSecret);
         protobufTransform.transformForBot(container);
 
-        var plaintext = MessageContainerSpec.encode(container);
+        var plaintext = LinkedMessageContainerSpec.encode(container);
         MessageEncryptedPayload payload;
         try {
             payload = encryption.encryptForDevice(botJid, plaintext);

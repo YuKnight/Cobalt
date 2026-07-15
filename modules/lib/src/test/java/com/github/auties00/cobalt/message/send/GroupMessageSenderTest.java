@@ -11,14 +11,14 @@ import com.github.auties00.cobalt.message.send.stanza.BotStanza;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadataBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadataBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
@@ -66,7 +66,7 @@ class GroupMessageSenderTest {
                 StubDeviceService.create().withGroupFanout(
                         g -> Set.of(PARTICIPANT_LID)));
 
-        sender.send(GROUP, chatMessage("3EB0GRP0001", GROUP, MessageContainer.of("hi")));
+        sender.send(GROUP, chatMessage("3EB0GRP0001", GROUP, LinkedMessageContainer.of("hi")));
 
         var stanza = captured.get();
         assertEquals("message", stanza.description());
@@ -100,7 +100,7 @@ class GroupMessageSenderTest {
                                 g -> Set.of(PARTICIPANT_LID))
                         .withEnsureSessions(devices -> 0));
 
-        sender.send(GROUP, chatMessage("3EB0GRP0002", GROUP, MessageContainer.of("hello group")));
+        sender.send(GROUP, chatMessage("3EB0GRP0002", GROUP, LinkedMessageContainer.of("hello group")));
 
         var stanza = captured.get();
         assertEquals("text", stanza.getAttributeAsString("type").orElseThrow());
@@ -138,7 +138,7 @@ class GroupMessageSenderTest {
                 StubDeviceService.create().withGroupFanout(
                         g -> Set.of(participantPn)));
 
-        sender.send(GROUP, chatMessage("3EB0GRPPN01", GROUP, MessageContainer.of("hi")));
+        sender.send(GROUP, chatMessage("3EB0GRPPN01", GROUP, LinkedMessageContainer.of("hi")));
 
         var stanza = captured.get();
         assertEquals("pn", stanza.getAttributeAsString("addressing_mode").orElseThrow(),
@@ -188,7 +188,7 @@ class GroupMessageSenderTest {
     }
 
     private static ChatMessageInfo chatMessage(
-            String id, Jid groupJid, MessageContainer container) {
+            String id, Jid groupJid, LinkedMessageContainer container) {
         var key = new MessageKeyBuilder()
                 .id(id)
                 .parentJid(groupJid)

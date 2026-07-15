@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.LpcInterpolator;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.SubframeLpc;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.param.ParamDecoder;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;

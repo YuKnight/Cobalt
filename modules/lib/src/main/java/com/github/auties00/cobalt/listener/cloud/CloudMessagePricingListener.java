@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.listener.cloud;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClientListener;
-import com.github.auties00.cobalt.model.cloud.CloudMessagePricing;
-import com.github.auties00.cobalt.model.message.MessageKey;
+import com.github.auties00.cobalt.wire.cloud.CloudMessagePricing;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
 
 /**
  * A functional interface for the {@link CloudWhatsAppClientListener#onMessagePricing onMessagePricing}

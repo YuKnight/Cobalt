@@ -4,7 +4,8 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCorruptedStoreException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
@@ -13,79 +14,79 @@ import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.chat.ChatKeepType;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.EmptyMessage;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.event.EventMessage;
-import com.github.auties00.cobalt.model.message.group.GroupInviteMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessage;
-import com.github.auties00.cobalt.model.message.interactive.TemplateButtonReplyMessage;
-import com.github.auties00.cobalt.model.message.location.LiveLocationMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.*;
-import com.github.auties00.cobalt.model.message.newsletter.NewsletterAdminInviteMessage;
-import com.github.auties00.cobalt.model.message.newsletter.NewsletterFollowerInviteMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollResultSnapshotMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.EncCommentMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.security.SecretEncMessage;
-import com.github.auties00.cobalt.model.message.system.*;
-import com.github.auties00.cobalt.model.message.system.history.MessageHistoryNotice;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.wire.linked.chat.ChatKeepType;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.message.EmptyMessage;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EventMessage;
+import com.github.auties00.cobalt.wire.linked.message.group.GroupInviteMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.TemplateButtonReplyMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LiveLocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.*;
+import com.github.auties00.cobalt.wire.linked.message.newsletter.NewsletterAdminInviteMessage;
+import com.github.auties00.cobalt.wire.linked.message.newsletter.NewsletterFollowerInviteMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollResultSnapshotMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncCommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.SecretEncMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.*;
+import com.github.auties00.cobalt.wire.linked.message.system.history.MessageHistoryNotice;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.AndroidMessageSendPerfEventBuilder;
-import com.github.auties00.cobalt.wam.event.DisappearingMessageKeepInChatEventBuilder;
-import com.github.auties00.cobalt.wam.event.E2eMessageSendEventBuilder;
-import com.github.auties00.cobalt.wam.event.KeepInChatErrorsEventBuilder;
-import com.github.auties00.cobalt.wam.event.KeepInChatPerfEventBuilder;
-import com.github.auties00.cobalt.wam.event.PnhRequestRevealActionEventBuilder;
-import com.github.auties00.cobalt.wam.event.StickerSendEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.AndroidMessageSendPerfEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.DisappearingMessageKeepInChatEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.E2eMessageSendEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.KeepInChatErrorsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.KeepInChatPerfEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PnhRequestRevealActionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.StickerSendEventBuilder;
 import com.github.auties00.cobalt.wam.threadlogging.LiveThreadLoggingService;
-import com.github.auties00.cobalt.wam.type.AddressingMode;
-import com.github.auties00.cobalt.wam.type.AgentEngagementEnumType;
-import com.github.auties00.cobalt.wam.type.ClientMessageSendStage;
-import com.github.auties00.cobalt.wam.type.E2eCiphertextType;
-import com.github.auties00.cobalt.wam.type.E2eDestination;
-import com.github.auties00.cobalt.wam.type.EditType;
-import com.github.auties00.cobalt.wam.type.EncryptionTypeCode;
-import com.github.auties00.cobalt.wam.type.KicActionNameType;
-import com.github.auties00.cobalt.wam.type.KicActionType;
-import com.github.auties00.cobalt.wam.type.KicActorType;
-import com.github.auties00.cobalt.wam.type.KicEntryPointType;
-import com.github.auties00.cobalt.wam.type.KicErrorCodeType;
-import com.github.auties00.cobalt.wam.type.KicRequestTypeType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageSendResultType;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.PlaceholderReasonType;
-import com.github.auties00.cobalt.wam.type.PnhActionType;
-import com.github.auties00.cobalt.wam.type.PnhEntryPointType;
-import com.github.auties00.cobalt.wam.type.PnhMessageChatParty;
-import com.github.auties00.cobalt.wam.type.ResponseType;
-import com.github.auties00.cobalt.wam.type.StickerSendMessageType;
-import com.github.auties00.cobalt.wam.type.StickerSendOriginType;
+import com.github.auties00.cobalt.wire.wam.type.AddressingMode;
+import com.github.auties00.cobalt.wire.wam.type.AgentEngagementEnumType;
+import com.github.auties00.cobalt.wire.wam.type.ClientMessageSendStage;
+import com.github.auties00.cobalt.wire.wam.type.E2eCiphertextType;
+import com.github.auties00.cobalt.wire.wam.type.E2eDestination;
+import com.github.auties00.cobalt.wire.wam.type.EditType;
+import com.github.auties00.cobalt.wire.wam.type.EncryptionTypeCode;
+import com.github.auties00.cobalt.wire.wam.type.KicActionNameType;
+import com.github.auties00.cobalt.wire.wam.type.KicActionType;
+import com.github.auties00.cobalt.wire.wam.type.KicActorType;
+import com.github.auties00.cobalt.wire.wam.type.KicEntryPointType;
+import com.github.auties00.cobalt.wire.wam.type.KicErrorCodeType;
+import com.github.auties00.cobalt.wire.wam.type.KicRequestTypeType;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MessageSendResultType;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.wam.type.PlaceholderReasonType;
+import com.github.auties00.cobalt.wire.wam.type.PnhActionType;
+import com.github.auties00.cobalt.wire.wam.type.PnhEntryPointType;
+import com.github.auties00.cobalt.wire.wam.type.PnhMessageChatParty;
+import com.github.auties00.cobalt.wire.wam.type.ResponseType;
+import com.github.auties00.cobalt.wire.wam.type.StickerSendMessageType;
+import com.github.auties00.cobalt.wire.wam.type.StickerSendOriginType;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;
@@ -112,7 +113,7 @@ import java.util.function.Supplier;
 @WhatsAppWebModule(moduleName = "WAWebE2EProtoUtils")
 @WhatsAppWebModule(moduleName = "WAWebAdvSignatureApi")
 @WhatsAppWebModule(moduleName = "WAWebBackendJobsCommon")
-abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSender, GroupMessageSender, StatusMessageSender, BroadcastMessageSender, NewsletterMessageSender, PeerMessageSender {
+abstract sealed class MessageSender<T extends LinkedMessageInfo> permits UserMessageSender, GroupMessageSender, StatusMessageSender, BroadcastMessageSender, NewsletterMessageSender, PeerMessageSender {
     /**
      * The logger for {@link MessageSender}.
      */
@@ -177,7 +178,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     }
 
     /**
-     * Dispatches the supplied {@link MessageInfo} to the given chat or audience
+     * Dispatches the supplied {@link LinkedMessageInfo} to the given chat or audience
      * JID, serialised per conversation.
      *
      * <p>Waits for the offline backlog to drain, then runs {@link #doSend} while
@@ -186,7 +187,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * steps. Sends to different conversations run in parallel; the per-session
      * and per-sender-key ratchets are additionally guarded by
      * {@link com.github.auties00.cobalt.message.crypto.SignalCryptoLocks}. The
-     * dispatch from {@link MessageSendingService#send(MessageInfo)} routes by JID
+     * dispatch from {@link MessageSendingService#send(LinkedMessageInfo)} routes by JID
      * server.
      *
      * <p>The whole dispatch is timed so that, once the server ack has been
@@ -243,7 +244,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * <p>Serialises the whole send pipeline for one conversation so the
      * device-partition read, the key-rotation decision, the sender-key
      * distribution, and the SKMSG ratchet cannot interleave with another send to
-     * the same target. The base {@link #send(Jid, MessageInfo)} routes every
+     * the same target. The base {@link #send(Jid, LinkedMessageInfo)} routes every
      * send through this; {@link GroupMessageSender#sendKeyDistribution(Jid, String)}
      * also calls it directly for the standalone distribution flow.
      *
@@ -264,7 +265,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
         Objects.requireNonNull(task, "task");
         var lock = sendLocks.computeIfAbsent(conversationKey, _ -> new ReentrantLock());
         if (Log.TRACE) {
-            LOGGER.log(Level.TRACE, "acquiring send lock for {0}", Log.jid(conversationKey));
+            LOGGER.log(Level.TRACE, "acquiring send lock for {0}", new LogRedactable.User(conversationKey));
         }
         lock.lock();
         try {
@@ -379,7 +380,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      *
      * @param encryption     the {@link MessageEncryption} service to use
      * @param devices        the device {@link Jid}s to encrypt for
-     * @param container      the source {@link MessageContainer}
+     * @param container      the source {@link LinkedMessageContainer}
      * @param destinationJid the chat recipient JID, written into the
      *                       {@code DeviceSentMessage} wrapper sent to self
      *                       devices
@@ -397,7 +398,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     List<MessageEncryptedPayload> encryptForDevices(
             MessageEncryption encryption,
             Collection<Jid> devices,
-            MessageContainer container,
+            LinkedMessageContainer container,
             Jid destinationJid,
             IcdcResult senderIcdc,
             IcdcResult recipientIcdc
@@ -424,20 +425,20 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                             .destinationJid(destinationJid)
                             .messageContainer(innerContainer)
                             .build();
-                    var wrapped = MessageContainer.of(deviceSentMessage);
+                    var wrapped = LinkedMessageContainer.of(deviceSentMessage);
                     if (innerContextInfo != null) {
                         wrapped = wrapped.withMessageContextInfo(innerContextInfo);
                     }
-                    devicePlaintext = MessageContainerSpec.encode(wrapped);
+                    devicePlaintext = LinkedMessageContainerSpec.encode(wrapped);
                 } else {
-                    devicePlaintext = MessageContainerSpec.encode(recipientContainer);
+                    devicePlaintext = LinkedMessageContainerSpec.encode(recipientContainer);
                 }
                 var payload = encryption.encryptForDevice(device, devicePlaintext);
                 results.add(payload);
                 emitE2eMessageSendEvent(device, container, true, payload.type(), 0);
             } catch (Exception e) {
                 if (Log.WARNING) {
-                    LOGGER.log(Level.WARNING, "device encryption failed for " + Log.jid(device.toString()), e);
+                    LOGGER.log(Level.WARNING, "device encryption failed for " + new LogRedactable.User(device.toString()), e);
                 }
                 emitE2eMessageSendEvent(device, container, false, null, 0);
             }
@@ -454,7 +455,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
 
     /**
      * Returns the wire-level {@code type} attribute value for the given
-     * {@link MessageContainer}.
+     * {@link LinkedMessageContainer}.
      *
      * <p>The result is one of {@code "text"}, {@code "media"},
      * {@code "reaction"}, {@code "poll"}, or {@code "event"} and is stamped onto
@@ -463,12 +464,12 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * {@code typeAttributeFromProtobuf} so receivers parse the wire shape
      * identically.
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return the {@code type} attribute value; never {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoUtils", exports = "typeAttributeFromProtobuf",
             adaptation = WhatsAppAdaptation.DIRECT)
-    String resolveStanzaType(MessageContainer container) {
+    String resolveStanzaType(LinkedMessageContainer container) {
         var message = container.content();
         return switch (message) {
             case ReactionMessage _ -> "reaction";
@@ -511,17 +512,17 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * Returns the wire {@code edit} attribute value for {@code container},
      * defaulting to the non-admin revoke classification.
      *
-     * <p>Delegates to {@link #resolveEditAttribute(MessageContainer, boolean)}
+     * <p>Delegates to {@link #resolveEditAttribute(LinkedMessageContainer, boolean)}
      * with {@code isAdminRevoke=false}; every send path other than the group
      * admin-revoke branch uses this overload.
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return the {@code edit} value, or {@code null} when no attribute should
      *         be written
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "editAttribute",
             adaptation = WhatsAppAdaptation.DIRECT)
-    String resolveEditAttribute(MessageContainer container) {
+    String resolveEditAttribute(LinkedMessageContainer container) {
         return resolveEditAttribute(container, false);
     }
 
@@ -535,7 +536,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * message-edit, and {@code "2"} for pin-in-chat. Anything else returns
      * {@code null} and the caller drops the attribute.
      *
-     * @param container     the outbound {@link MessageContainer}
+     * @param container     the outbound {@link LinkedMessageContainer}
      * @param isAdminRevoke {@code true} when a group admin is revoking a
      *                      participant's message
      * @return the {@code edit} value, or {@code null} when no attribute should
@@ -543,7 +544,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "editAttribute",
             adaptation = WhatsAppAdaptation.DIRECT)
-    String resolveEditAttribute(MessageContainer container, boolean isAdminRevoke) {
+    String resolveEditAttribute(LinkedMessageContainer container, boolean isAdminRevoke) {
         var message = container.content();
         return switch (message) {
             case ProtocolMessage p when p.type().orElse(null) == ProtocolMessage.Type.REVOKE ->
@@ -576,12 +577,12 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * (revoke, message edit, ephemeral sync response, welcome request). Anything
      * else returns {@code null} so the caller drops the attribute.
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return {@code "hide"} or {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoUtils", exports = "decryptFailAttributeFromProtobuf",
             adaptation = WhatsAppAdaptation.DIRECT)
-    String resolveDecryptFail(MessageContainer container) {
+    String resolveDecryptFail(LinkedMessageContainer container) {
         var message = container.content();
         return switch (message) {
             case ReactionMessage _ -> "hide";
@@ -602,21 +603,21 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
 
     /**
      * Returns the wire {@code mediatype} attribute value written onto the inner
-     * {@code <enc>} child for the given {@link MessageContainer}.
+     * {@code <enc>} child for the given {@link LinkedMessageContainer}.
      *
      * <p>Every chat-fanout and group-skmsg stanza builder uses this. The result
      * matches WA Web's {@code mediaTypeFromProtobuf} and
      * {@code encodeMaybeMediaType} pair; {@code null} means the attribute is
      * dropped (non-media payload).
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return the {@code mediatype} value, or {@code null} for non-media
      *         payloads
      */
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon",
             exports = {"mediaTypeFromProtobuf", "encodeMaybeMediaType"},
             adaptation = WhatsAppAdaptation.DIRECT)
-    String resolveMediaType(MessageContainer container) {
+    String resolveMediaType(LinkedMessageContainer container) {
         var message = container.content();
         return switch (message) {
             case ImageMessage _ -> "image";
@@ -645,13 +646,13 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * {@link InteractiveResponseMessage} payloads with an inner
      * {@link InteractiveResponseMessage.NativeFlowResponseMessage} carry it.
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return the native flow name, or {@code null} when the payload is not a
      *         native-flow response
      */
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "nativeFlowNameTypeFromProtobuf",
             adaptation = WhatsAppAdaptation.DIRECT)
-    String resolveNativeFlowName(MessageContainer container) {
+    String resolveNativeFlowName(LinkedMessageContainer container) {
         var message = container.content();
         if (!(message instanceof InteractiveResponseMessage irm)) {
             return null;
@@ -692,7 +693,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * undo-keep-for-all by the original sender.
      *
      * <p>Drives the
-     * {@link #resolveEditAttribute(MessageContainer, boolean)} branch that maps
+     * {@link #resolveEditAttribute(LinkedMessageContainer, boolean)} branch that maps
      * undo-keep-for-all to the sender-revoke value ({@code "7"}); the operation
      * is allowed only on messages the caller originally sent.
      *
@@ -712,8 +713,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * per-device Signal encryption result.
      *
      * <p>Called from the per-device loop in
-     * {@link #encryptForDevices(MessageEncryption, Collection, MessageContainer, Jid, IcdcResult, IcdcResult)}
-     * and from {@link PeerMessageSender#doSend(Jid, com.github.auties00.cobalt.model.chat.ChatMessageInfo)}.
+     * {@link #encryptForDevices(MessageEncryption, Collection, LinkedMessageContainer, Jid, IcdcResult, IcdcResult)}
+     * and from {@link PeerMessageSender#doSend(Jid, com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo)}.
      *
      * @implNote
      * This implementation collapses WA Web's
@@ -723,7 +724,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * population (hosted COEX flag, agent-engagement flag) handled inline.
      *
      * @param device         the recipient device {@link Jid}
-     * @param container      the encrypted {@link MessageContainer}, or
+     * @param container      the encrypted {@link LinkedMessageContainer}, or
      *                       {@code null} when the encryption carried no
      *                       user-visible payload
      * @param success        {@code true} for a successful encryption
@@ -735,7 +736,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     @WhatsAppWebExport(moduleName = "WAWebPostE2eMessageSendMetric",
             exports = {"postSuccessDirectE2eMessageSendMetric", "postFailureDirectE2eMessageSendMetric"},
             adaptation = WhatsAppAdaptation.ADAPTED)
-    void emitE2eMessageSendEvent(Jid device, MessageContainer container, boolean success,
+    void emitE2eMessageSendEvent(Jid device, LinkedMessageContainer container, boolean success,
                                  MessageEncryptionType ciphertextType,
                                  int retryCount) {
         var builder = new E2eMessageSendEventBuilder()
@@ -772,7 +773,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * and the addressing mode are reflected on the emitted event.
      *
      * @param groupOrStatusJid    the SKMSG target {@link Jid}
-     * @param container           the {@link MessageContainer} being encrypted
+     * @param container           the {@link LinkedMessageContainer} being encrypted
      * @param destination         the semantic destination
      *                            ({@link E2eDestination#GROUP} or
      *                            {@link E2eDestination#STATUS})
@@ -781,7 +782,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgSenderKey",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    void emitE2eMessageSendSenderKeyEvent(Jid groupOrStatusJid, MessageContainer container,
+    void emitE2eMessageSendSenderKeyEvent(Jid groupOrStatusJid, LinkedMessageContainer container,
                                           E2eDestination destination, boolean isLidAddressingMode,
                                           boolean success) {
         var builder = new E2eMessageSendEventBuilder()
@@ -806,10 +807,10 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * Commits the {@code AndroidMessageSendPerfEvent} (event id 1994) that
      * records the just-completed send's stage timing and terminal result.
      *
-     * <p>Every send routed through {@link #send(Jid, MessageInfo)} emits one of
+     * <p>Every send routed through {@link #send(Jid, LinkedMessageInfo)} emits one of
      * these regardless of chat kind. The {@code builder} is created and its
      * {@code durationT}/{@code durationRelative} timers started by
-     * {@link #send(Jid, MessageInfo)} immediately before the dispatch, so this
+     * {@link #send(Jid, LinkedMessageInfo)} immediately before the dispatch, so this
      * method stops those timers to record the real wall-clock cost, stamps the
      * terminal {@link ClientMessageSendStage#CLIENT_WRITTEN_WIRE} stage, and
      * folds the parsed {@link AckResult} into the {@link MessageSendResultType}
@@ -826,14 +827,14 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * {@code phoneCores} from {@link Runtime#availableProcessors()}.
      *
      * @param chatJid   the send destination JID
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @param builder   the perf builder whose timers were started before the
      *                  dispatch
      * @param ack       the parsed server {@link AckResult}
      */
     @WhatsAppWebExport(moduleName = "WAWebMessageSendPerfReporter", exports = "MessageSendPerfReporter",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    void emitMessageSendPerfEvent(Jid chatJid, MessageContainer container,
+    void emitMessageSendPerfEvent(Jid chatJid, LinkedMessageContainer container,
                                   AndroidMessageSendPerfEventBuilder builder, AckResult ack) {
         var editType = mapEditType(container);
         builder.stopDurationT()
@@ -871,10 +872,10 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * the generic send).
      *
      * @param chatJid   the send destination JID
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @param ack       the parsed server {@link AckResult}
      */
-    void emitContentSendTelemetry(Jid chatJid, MessageContainer container, AckResult ack) {
+    void emitContentSendTelemetry(Jid chatJid, LinkedMessageContainer container, AckResult ack) {
         switch (container.content()) {
             case StickerMessage sticker -> emitStickerSendEvent(sticker);
             case KeepInChatMessage keep -> emitKeepInChatEvents(chatJid, keep, ack);
@@ -1089,10 +1090,10 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * <p>Only {@link ContextualMessage} payloads expose the forwarding flag;
      * control payloads report {@code false}.
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return {@code true} when the payload is a forward
      */
-    private static boolean isForwarded(MessageContainer container) {
+    private static boolean isForwarded(LinkedMessageContainer container) {
         return container.content() instanceof ContextualMessage contextual
                 && contextual.contextInfo()
                 .map(ContextInfo::isForwarded)
@@ -1156,19 +1157,19 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     }
 
     /**
-     * Maps the content of the given {@link MessageContainer} to the matching
+     * Maps the content of the given {@link LinkedMessageContainer} to the matching
      * WAM {@link MediaType}.
      *
      * <p>Populates the {@code messageMediaType} slot on the WAM
      * {@code E2eMessageSendEvent}; non-classifiable payloads return
      * {@code null} so the field is omitted.
      *
-     * @param container the outbound {@link MessageContainer}
+     * @param container the outbound {@link LinkedMessageContainer}
      * @return the matching {@link MediaType}, or {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static MediaType mapMediaType(MessageContainer container) {
+    private static MediaType mapMediaType(LinkedMessageContainer container) {
         var message = container.content();
         return switch (message) {
             case ImageMessage _ -> MediaType.PHOTO;
@@ -1325,20 +1326,20 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     }
 
     /**
-     * Maps the given {@link MessageContainer} to the WAM {@link EditType}
+     * Maps the given {@link LinkedMessageContainer} to the WAM {@link EditType}
      * classification used on outbound metric events.
      *
      * <p>Used by {@link #emitE2eMessageSendSenderKeyEvent} to populate the
      * {@code editType} slot on SKMSG events without requiring callers to
      * round-trip through the wire {@code edit} string.
      *
-     * @param container the outbound {@link MessageContainer}, possibly
+     * @param container the outbound {@link LinkedMessageContainer}, possibly
      *                  {@code null}
      * @return the matching {@link EditType}; never {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "getMetricEditTypeFromMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static EditType mapEditType(MessageContainer container) {
+    private static EditType mapEditType(LinkedMessageContainer container) {
         if (container == null) {
             return EditType.NOT_EDITED;
         }

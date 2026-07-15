@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -9,18 +9,18 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.EphemeralOutOfSyncInfoEventBuilder;
-import com.github.auties00.cobalt.wam.event.EphemeralSyncResponseReceiveEventBuilder;
-import com.github.auties00.cobalt.wam.event.EphemeralSyncResponseSendEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.EphemeralOutOfSyncInfoEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.EphemeralSyncResponseReceiveEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.EphemeralSyncResponseSendEventBuilder;
 import com.github.auties00.cobalt.wam.threadlogging.LiveThreadLoggingService;
-import com.github.auties00.cobalt.wam.type.DisappearingChatInitiatorType;
-import com.github.auties00.cobalt.wam.type.EphemeralityInitiatorType;
-import com.github.auties00.cobalt.wam.type.EphemeralityTriggerActionType;
-import com.github.auties00.cobalt.wam.type.EsrFailureReasonType;
-import com.github.auties00.cobalt.wam.type.EsrSendResultType;
+import com.github.auties00.cobalt.wire.wam.type.DisappearingChatInitiatorType;
+import com.github.auties00.cobalt.wire.wam.type.EphemeralityInitiatorType;
+import com.github.auties00.cobalt.wire.wam.type.EphemeralityTriggerActionType;
+import com.github.auties00.cobalt.wire.wam.type.EsrFailureReasonType;
+import com.github.auties00.cobalt.wire.wam.type.EsrSendResultType;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;

@@ -1,21 +1,21 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
-import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.BotWelcomeRequestAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.BotWelcomeRequestActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.HatchUserJourneyEvent;
-import com.github.auties00.cobalt.wam.event.HatchUserJourneyEventBuilder;
-import com.github.auties00.cobalt.wam.type.BotEntryPointType;
-import com.github.auties00.cobalt.wam.type.HatchActionType;
+import com.github.auties00.cobalt.wire.wam.event.HatchUserJourneyEvent;
+import com.github.auties00.cobalt.wire.wam.event.HatchUserJourneyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.BotEntryPointType;
+import com.github.auties00.cobalt.wire.wam.type.HatchActionType;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;

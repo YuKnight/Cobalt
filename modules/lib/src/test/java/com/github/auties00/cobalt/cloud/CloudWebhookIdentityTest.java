@@ -2,8 +2,9 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageStatus;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudMessageInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +35,7 @@ class CloudWebhookIdentityTest {
                 "type":"text","text":{"body":"hi from a hidden number"}}]}""");
         var messages = CloudWebhookDecoder.decodeMessages(value);
         assertEquals(1, messages.size());
-        var info = messages.getFirst();
+        var info = (CloudMessageInfo) messages.getFirst();
         assertEquals("wamid.HBgLhidden", info.key().id().orElseThrow());
         assertEquals(Jid.of("99887766554433"), info.key().parentJid().orElseThrow());
         assertEquals("Hidden User", info.pushName().orElseThrow());
@@ -49,7 +50,7 @@ class CloudWebhookIdentityTest {
                 "type":"text","text":{"body":"hi"}}]}""");
         var messages = CloudWebhookDecoder.decodeMessages(value);
         assertEquals(1, messages.size());
-        var info = messages.getFirst();
+        var info = (CloudMessageInfo) messages.getFirst();
         assertEquals("wamid.H", info.key().id().orElseThrow());
         assertTrue(info.key().parentJid().isEmpty());
         assertEquals("Hidden User", info.pushName().orElseThrow());
@@ -62,7 +63,7 @@ class CloudWebhookIdentityTest {
                 {"contacts":[{"profile":{"name":"Diego"},"wa_id":"12065550102"}],
                 "messages":[{"from":"12065550102","id":"wamid.A","timestamp":"1723506230",
                 "type":"text","text":{"body":"hi"}}]}""");
-        var info = CloudWebhookDecoder.decodeMessages(value).getFirst();
+        var info = (CloudMessageInfo) CloudWebhookDecoder.decodeMessages(value).getFirst();
         assertEquals(Jid.of("12065550102"), info.key().parentJid().orElseThrow());
         assertEquals("Diego", info.pushName().orElseThrow());
     }

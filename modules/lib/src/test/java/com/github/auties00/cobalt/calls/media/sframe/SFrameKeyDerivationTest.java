@@ -68,7 +68,7 @@ public class SFrameKeyDerivationTest {
             // off a JID; both must hit the identical live KAT.
             var typed = com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation
                     .deriveSframeBaseKey(SECRET,
-                            com.github.auties00.cobalt.model.jid.Jid.of(PARTICIPANT_JID));
+                            com.github.auties00.cobalt.wire.core.jid.Jid.of(PARTICIPANT_JID));
             assertArrayEquals(EXPECTED_BASE_KEY, typed);
             assertArrayEquals(typed, SFrameKeyDerivation.deriveBaseKey(SECRET, PARTICIPANT_JID));
         }

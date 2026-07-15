@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.passkey;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.warden.HybridAssertion;
 import com.github.auties00.warden.HybridAssertionListener;
 import com.github.auties00.warden.PasskeyAssertion;

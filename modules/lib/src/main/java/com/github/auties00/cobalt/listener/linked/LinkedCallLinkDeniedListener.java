@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.listener.linked;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
-import com.github.auties00.cobalt.model.call.JoinableCallLink;
+import com.github.auties00.cobalt.wire.linked.call.JoinableCallLink;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 
 /**

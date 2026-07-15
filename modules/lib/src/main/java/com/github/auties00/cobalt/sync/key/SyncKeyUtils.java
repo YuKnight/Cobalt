@@ -3,9 +3,9 @@ package com.github.auties00.cobalt.sync.key;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyId;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.nio.ByteBuffer;

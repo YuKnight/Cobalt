@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
@@ -15,26 +15,27 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthe
 import com.github.auties00.cobalt.exception.linked.WhatsAppIntegrityChallengeException;
 import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListener;
 import com.github.auties00.cobalt.listener.linked.LinkedIntegrityChallengeListener;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.integrity.IntegrityChallenge;
-import com.github.auties00.cobalt.stanza.mex.json.misc.IntegrityChallengeResponseMexRequest;
-import com.github.auties00.cobalt.stanza.mex.json.misc.IntegrityChallengeResponseMexResponse;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.integrity.IntegrityChallenge;
+import com.github.auties00.cobalt.wire.stanza.mex.json.misc.IntegrityChallengeResponseMexRequest;
+import com.github.auties00.cobalt.wire.stanza.mex.json.misc.IntegrityChallengeResponseMexResponse;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.contact.ContactTextStatus;
-import com.github.auties00.cobalt.model.contact.ContactTextStatusBuilder;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMetadataBuilder;
-import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatus;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatusBuilder;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterViewerRole;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MessageCappingEventBuilder;
-import com.github.auties00.cobalt.wam.type.MessageCappingActionType;
+import com.github.auties00.cobalt.wire.wam.event.MessageCappingEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MessageCappingActionType;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
@@ -441,7 +442,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             } catch (Throwable throwable) {
                 if (Log.DEBUG) {
                     LOGGER.log(Level.DEBUG,
-                            "cannot refresh text-status data for " + Log.jid(jid.toString()),
+                            "cannot refresh text-status data for " + new LogRedactable.User(jid.toString()),
                             throwable);
                 }
             }
@@ -539,7 +540,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
      *
      * @implNote
      * This implementation does not call the typed
-     * {@link com.github.auties00.cobalt.stanza.mex.json.user.LidChangeNotificationMexResponse} parser because the
+     * {@link com.github.auties00.cobalt.wire.stanza.mex.json.user.LidChangeNotificationMexResponse} parser because the
      * notification body is inline JSON rather than the IQ-wrapped envelope that parser expects; the {@code old} and
      * {@code new} keys under {@code xwa2_notify_lid_change} are read directly.
      *
@@ -794,7 +795,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             } catch (Throwable throwable) {
                 if (Log.DEBUG) {
                     LOGGER.log(Level.DEBUG,
-                            "cannot refresh group metadata for " + Log.jid(jid.toString()),
+                            "cannot refresh group metadata for " + new LogRedactable.User(jid.toString()),
                             throwable);
                 }
             }
@@ -840,7 +841,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             } catch (Throwable throwable) {
                 if (Log.DEBUG) {
                     LOGGER.log(Level.DEBUG,
-                            "cannot refresh username metadata for " + Log.jid(userJid.toString()),
+                            "cannot refresh username metadata for " + new LogRedactable.User(userJid.toString()),
                             throwable);
                 }
             }

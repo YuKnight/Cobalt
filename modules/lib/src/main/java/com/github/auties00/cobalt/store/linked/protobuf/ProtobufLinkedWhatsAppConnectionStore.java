@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.store.linked.protobuf;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppConnectionStore;
 
 import java.lang.System.Logger.Level;

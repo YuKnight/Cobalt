@@ -1,21 +1,21 @@
 package com.github.auties00.cobalt.message;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.EmptyMessage;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.system.FutureProofMessage;
-import com.github.auties00.cobalt.model.message.system.FutureProofMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
-import com.github.auties00.cobalt.model.message.system.DeviceSentMessageBuilder;
-import com.github.auties00.cobalt.model.message.media.ImageMessage;
-import com.github.auties00.cobalt.model.message.media.ImageMessageBuilder;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.EmptyMessage;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.FutureProofMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.FutureProofMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.DeviceSentMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.DeviceSentMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessageBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,19 +25,19 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers {@link MessageContainer#content()} and {@link MessageContainer#contextualContent()},
+ * Covers {@link LinkedMessageContainer#content()} and {@link LinkedMessageContainer#contextualContent()},
  * the resolvers that walk the union-of-fields {@code Message} protobuf and return the
  * innermost payload. Containers are assembled through the generated builders rather than
  * parsed from protobuf bytes, so the precedence assertions exercise the in-memory resolver
  * only.
  */
-@DisplayName("MessageContainer.content")
-class MessageContainerContentTest {
+@DisplayName("LinkedMessageContainer.content")
+class LinkedMessageContainerContentTest {
 
     @Test
     @DisplayName("empty container returns an EmptyMessage sentinel")
     void emptyContainer() {
-        var container = MessageContainer.empty();
+        var container = LinkedMessageContainer.empty();
         assertInstanceOf(EmptyMessage.class, container.content());
         assertTrue(container.isEmpty());
     }
@@ -45,7 +45,7 @@ class MessageContainerContentTest {
     @Test
     @DisplayName("string conversation field promotes to an ExtendedTextMessage")
     void conversationPromotesToExtendedText() {
-        var container = MessageContainer.of("hello world");
+        var container = LinkedMessageContainer.of("hello world");
 
         var content = container.content();
         assertInstanceOf(ExtendedTextMessage.class, content);
@@ -59,7 +59,7 @@ class MessageContainerContentTest {
         var image = new ImageMessageBuilder()
                 .caption("a picture")
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .imageMessage(image)
                 .build();
 
@@ -76,11 +76,11 @@ class MessageContainerContentTest {
                 .degreesLongitude(0.0)
                 .build();
         var viewOnce = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .locationMessage(location)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .viewOnceMessage(viewOnce)
                 .build();
 
@@ -94,11 +94,11 @@ class MessageContainerContentTest {
     void futureProofEphemeralUnwraps() {
         var image = new ImageMessageBuilder().caption("eph").build();
         var ephemeral = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .imageMessage(image)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .ephemeralMessage(ephemeral)
                 .build();
         assertSame(image, container.content());
@@ -109,11 +109,11 @@ class MessageContainerContentTest {
     void futureProofEditedUnwraps() {
         var text = new ExtendedTextMessageBuilder().text("edited body").build();
         var edited = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .extendedTextMessage(text)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .editedMessage(edited)
                 .build();
         assertSame(text, container.content());
@@ -124,16 +124,16 @@ class MessageContainerContentTest {
     void nestedFutureProofUnwraps() {
         var image = new ImageMessageBuilder().caption("nested").build();
         var inner = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .imageMessage(image)
                         .build())
                 .build();
         var outer = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .viewOnceMessage(inner)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .ephemeralMessage(outer)
                 .build();
 
@@ -147,11 +147,11 @@ class MessageContainerContentTest {
         var reaction = new ReactionMessageBuilder().text("👍").build();
         var deviceSent = new DeviceSentMessageBuilder()
                 .destinationJid(Jid.of("12025550100@s.whatsapp.net"))
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .reactionMessage(reaction)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .deviceSentMessage(deviceSent)
                 .build();
 
@@ -165,11 +165,11 @@ class MessageContainerContentTest {
         var directText = new ExtendedTextMessageBuilder().text("direct").build();
         var wrapped = new ImageMessageBuilder().caption("wrapped").build();
         var viewOnce = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .imageMessage(wrapped)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .extendedTextMessage(directText)
                 .viewOnceMessage(viewOnce)
                 .build();
@@ -182,7 +182,7 @@ class MessageContainerContentTest {
     @DisplayName("contextualContent() returns the contextual inner message when present")
     void contextualContentReturnsContextual() {
         var text = new ExtendedTextMessageBuilder().text("with context").build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .extendedTextMessage(text)
                 .build();
 
@@ -195,7 +195,7 @@ class MessageContainerContentTest {
     @DisplayName("contextualContent() returns empty when innermost message is not contextual")
     void contextualContentEmptyForNonContextual() {
         var reaction = new ReactionMessageBuilder().text("👍").build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .reactionMessage(reaction)
                 .build();
 
@@ -208,9 +208,9 @@ class MessageContainerContentTest {
     void deviceSentEmptyInner() {
         var deviceSent = new DeviceSentMessageBuilder()
                 .destinationJid(Jid.of("12025550100@s.whatsapp.net"))
-                .messageContainer(MessageContainer.empty())
+                .messageContainer(LinkedMessageContainer.empty())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .deviceSentMessage(deviceSent)
                 .build();
 
@@ -225,17 +225,17 @@ class MessageContainerContentTest {
                 .degreesLatitude(0.0).degreesLongitude(0.0)
                 .build();
         var groupMentioned = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .locationMessage(location)
                         .build())
                 .build();
         var siblingImage = new ImageMessageBuilder().caption("ignored").build();
         var siblingViewOnce = new FutureProofMessageBuilder()
-                .messageContainer(new MessageContainerBuilder()
+                .messageContainer(new LinkedMessageContainerBuilder()
                         .imageMessage(siblingImage)
                         .build())
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .groupMentionedMessage(groupMentioned)
                 .viewOnceMessage(siblingViewOnce)
                 .build();
@@ -248,7 +248,7 @@ class MessageContainerContentTest {
     @DisplayName("conversation field is overridden by extendedTextMessage when both are set")
     void conversationLosesToExtendedText() {
         var extended = new ExtendedTextMessageBuilder().text("the extended one").build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .conversation("the plain one")
                 .extendedTextMessage(extended)
                 .build();
@@ -260,28 +260,28 @@ class MessageContainerContentTest {
     }
 
     @Test
-    @DisplayName("static factory MessageContainer.of(Message) routes the message to the correct typed field")
+    @DisplayName("static factory LinkedMessageContainer.of(Message) routes the message to the correct typed field")
     void factoryOfMessageRoutes() {
         var image = new ImageMessageBuilder().caption("via factory").build();
-        var container = MessageContainer.of(image);
+        var container = LinkedMessageContainer.of(image);
         assertSame(image, container.content(),
-                "MessageContainer.of(image) must route to imageMessage and content() must return it");
+                "LinkedMessageContainer.of(image) must route to imageMessage and content() must return it");
 
         var location = new LocationMessageBuilder().name("origin").degreesLatitude(0.0).degreesLongitude(0.0).build();
-        var locContainer = MessageContainer.of(location);
+        var locContainer = LinkedMessageContainer.of(location);
         assertSame(location, locContainer.content());
 
         var reaction = new ReactionMessageBuilder().text("🎯").build();
-        assertSame(reaction, MessageContainer.of(reaction).content());
+        assertSame(reaction, LinkedMessageContainer.of(reaction).content());
     }
 
     @Test
     @DisplayName("withMessageContextInfo preserves the original content")
     void withMessageContextInfoPreservesContent() {
         var image = new ImageMessageBuilder().caption("preserved").build();
-        var container = MessageContainer.of(image);
+        var container = LinkedMessageContainer.of(image);
 
-        var withCtx = new MessageContainerBuilder()
+        var withCtx = new LinkedMessageContainerBuilder()
                 .imageMessage(image)
                 .build();
         assertSame(image, withCtx.content(),

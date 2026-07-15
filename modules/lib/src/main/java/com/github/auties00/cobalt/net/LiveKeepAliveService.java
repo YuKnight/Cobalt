@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.net;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
 import java.lang.System.Logger.Level;

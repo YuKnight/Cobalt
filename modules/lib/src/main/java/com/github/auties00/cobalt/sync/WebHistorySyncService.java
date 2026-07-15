@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync;
 
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotification;
-import com.github.auties00.cobalt.model.sync.history.HistorySync;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncNotification;
+import com.github.auties00.cobalt.wire.linked.sync.history.HistorySync;
 
 /**
  * Pulls every {@link HistorySyncNotification} the primary device sends into a decoded

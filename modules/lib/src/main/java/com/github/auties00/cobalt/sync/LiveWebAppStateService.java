@@ -2,16 +2,16 @@ package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.listener.linked.LinkedWebAppStateActionListener;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.sync.action.SyncActionEntry;
-import com.github.auties00.cobalt.model.sync.action.SyncActionEntryBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.mutation.OrphanMutationEntry;
-import com.github.auties00.cobalt.model.sync.mutation.OrphanMutationEntryBuilder;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionEntry;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionEntryBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRange;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.OrphanMutationEntry;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.OrphanMutationEntryBuilder;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.sync.key.LiveMissingSyncKeyRequestService;
 import com.github.auties00.cobalt.sync.key.LiveSyncKeyRotationService;
@@ -28,24 +28,24 @@ import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.media.ExternalBlobReference;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateFatalExceptionNotificationBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData;
-import com.github.auties00.cobalt.model.signal.KeyId;
-import com.github.auties00.cobalt.model.sync.*;
-import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
-import com.github.auties00.cobalt.model.sync.data.*;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReference;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateFatalExceptionNotificationBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyData;
+import com.github.auties00.cobalt.wire.linked.signal.KeyId;
+import com.github.auties00.cobalt.wire.linked.sync.*;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ArchiveChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ClearChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.DeleteChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.MarkChatAsReadAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.*;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -63,31 +63,31 @@ import com.github.auties00.cobalt.sync.handler.SyncdIndexUtils;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MdAppStateMessageRangeEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdAppStateSyncMutationStatsEventBuilder;
-import com.github.auties00.cobalt.wam.event.SyncdKeyCountEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateDataDownloadedEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdBootstrapDataAppliedEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdAppStateSyncDailyEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdSyncdBundleEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdSyncdMutationEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdSyncdMutationsSummaryEventBuilder;
-import com.github.auties00.cobalt.wam.event.MediaDownload2EventBuilder;
-import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
-import com.github.auties00.cobalt.wam.type.DownloadOriginType;
-import com.github.auties00.cobalt.wam.type.MdBootstrapPayloadType;
-import com.github.auties00.cobalt.wam.type.MdBootstrapSource;
-import com.github.auties00.cobalt.wam.type.MdBootstrapStepResult;
-import com.github.auties00.cobalt.wam.type.MediaDownloadModeType;
-import com.github.auties00.cobalt.wam.type.MediaDownloadResultType;
-import com.github.auties00.cobalt.wam.type.KmpSyncdFlowEnum;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MutationBundleType;
-import com.github.auties00.cobalt.wam.type.MutationCountBucket;
-import com.github.auties00.cobalt.wam.type.MutationDirectionType;
-import com.github.auties00.cobalt.wam.type.MutationOperationType;
-import com.github.auties00.cobalt.wam.type.SyncdCollectionType;
+import com.github.auties00.cobalt.wire.wam.event.MdAppStateMessageRangeEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdAppStateSyncMutationStatsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.SyncdKeyCountEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdBootstrapAppStateDataDownloadedEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdBootstrapDataAppliedEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdAppStateSyncDailyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdSyncdBundleEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdSyncdMutationEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdSyncdMutationsSummaryEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MediaDownload2EventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wire.wam.type.DownloadOriginType;
+import com.github.auties00.cobalt.wire.wam.type.MdBootstrapPayloadType;
+import com.github.auties00.cobalt.wire.wam.type.MdBootstrapSource;
+import com.github.auties00.cobalt.wire.wam.type.MdBootstrapStepResult;
+import com.github.auties00.cobalt.wire.wam.type.MediaDownloadModeType;
+import com.github.auties00.cobalt.wire.wam.type.MediaDownloadResultType;
+import com.github.auties00.cobalt.wire.wam.type.KmpSyncdFlowEnum;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MutationBundleType;
+import com.github.auties00.cobalt.wire.wam.type.MutationCountBucket;
+import com.github.auties00.cobalt.wire.wam.type.MutationDirectionType;
+import com.github.auties00.cobalt.wire.wam.type.MutationOperationType;
+import com.github.auties00.cobalt.wire.wam.type.SyncdCollectionType;
 
 import javax.crypto.Mac;
 import java.io.InputStream;
@@ -1760,7 +1760,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
 
     /**
      * Maps a {@link SyncPatchType} to the matching
-     * {@link com.github.auties00.cobalt.wam.type.Collection} WAM enum constant.
+     * {@link com.github.auties00.cobalt.wire.wam.type.Collection} WAM enum constant.
      *
      * <p>Used by the bootstrap-data-applied event builder to translate the
      * internal collection type into the value consumed by the WAM pipeline.
@@ -1771,16 +1771,16 @@ public final class LiveWebAppStateService implements WebAppStateService {
      *
      * @param collectionName the non-{@code null} collection
      * @return the corresponding
-     *         {@link com.github.auties00.cobalt.wam.type.Collection}
+     *         {@link com.github.auties00.cobalt.wire.wam.type.Collection}
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics", exports = "collectionNameToMetric", adaptation = WhatsAppAdaptation.DIRECT)
-    private static com.github.auties00.cobalt.wam.type.Collection mapCollection(SyncPatchType collectionName) {
+    private static com.github.auties00.cobalt.wire.wam.type.Collection mapCollection(SyncPatchType collectionName) {
         return switch (collectionName) {
-            case CRITICAL_BLOCK -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_BLOCK;
-            case CRITICAL_UNBLOCK_LOW -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_UNBLOCK_LOW;
-            case REGULAR -> com.github.auties00.cobalt.wam.type.Collection.REGULAR;
-            case REGULAR_HIGH -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_HIGH;
-            case REGULAR_LOW -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_LOW;
+            case CRITICAL_BLOCK -> com.github.auties00.cobalt.wire.wam.type.Collection.CRITICAL_BLOCK;
+            case CRITICAL_UNBLOCK_LOW -> com.github.auties00.cobalt.wire.wam.type.Collection.CRITICAL_UNBLOCK_LOW;
+            case REGULAR -> com.github.auties00.cobalt.wire.wam.type.Collection.REGULAR;
+            case REGULAR_HIGH -> com.github.auties00.cobalt.wire.wam.type.Collection.REGULAR_HIGH;
+            case REGULAR_LOW -> com.github.auties00.cobalt.wire.wam.type.Collection.REGULAR_LOW;
         };
     }
 
@@ -3642,7 +3642,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      * Fans a freshly-applied app-state action out to every registered
      * {@link LinkedWebAppStateActionListener}.
      *
-     * <p>Fires once per decoded mutation that carries a {@link com.github.auties00.cobalt.model.sync.action.SyncAction},
+     * <p>Fires once per decoded mutation that carries a {@link com.github.auties00.cobalt.wire.linked.sync.action.SyncAction},
      * as the mutation is applied from an incoming snapshot or patch, passing the decoded action together
      * with the mutation's raw index. A mutation whose value carries no action (a bare remove keyed only by
      * its index) surfaces nothing, since there is no action to deliver. Orphan retries do not re-fire the
@@ -4109,7 +4109,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      *
      * @implNote
      * This implementation constructs the primary device JID with the
-     * four-argument {@link Jid#of(String, com.github.auties00.cobalt.model.jid.JidServer, int, int)}
+     * four-argument {@link Jid#of(String, com.github.auties00.cobalt.wire.core.jid.JidServer, int, int)}
      * form so the agent slot is explicitly zero and the caller's agent is not
      * preserved. The peer message is sent through the single
      * {@link LinkedWhatsAppClient#sendPeerMessage} entry point.
@@ -4135,7 +4135,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                 .appStateFatalExceptionNotification(notification)
                 .build();
 
-        var messageContainer = new MessageContainerBuilder()
+        var messageContainer = new LinkedMessageContainerBuilder()
                 .protocolMessage(protocolMessage)
                 .build();
 

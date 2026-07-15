@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.stream.message;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.sync.LiveWebHistorySyncService;
 
@@ -14,7 +14,8 @@ import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.listener.linked.LinkedNewStatusListener;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageService;
@@ -24,93 +25,94 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.message.receipt.MessageReceiptHandler;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanzaParser;
-import com.github.auties00.cobalt.model.business.BusinessHostStorageType;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.model.tos.TosNotice;
+import com.github.auties00.cobalt.wire.linked.business.BusinessHostStorageType;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.tos.TosNotice;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.tos.TosService;
-import com.github.auties00.cobalt.wam.event.GatedMessageReceivedEventBuilder;
-import com.github.auties00.cobalt.wam.type.ChatGatedReason;
+import com.github.auties00.cobalt.wire.wam.event.GatedMessageReceivedEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ChatGatedReason;
 import com.github.auties00.cobalt.quarantine.QuarantineService;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayload;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadSpec;
-import com.github.auties00.cobalt.model.message.*;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.*;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestResponseMessage;
-import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestType;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.text.CommentMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.payment.PaymentInviteMessage;
-import com.github.auties00.cobalt.model.message.payment.RequestPaymentMessage;
-import com.github.auties00.cobalt.model.message.payment.SendPaymentMessage;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.payment.OrphanPaymentNotificationBuilder;
-import com.github.auties00.cobalt.model.payment.PaymentInfo;
-import com.github.auties00.cobalt.model.payment.PaymentInfoBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayload;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayloadSpec;
+import com.github.auties00.cobalt.wire.linked.message.*;
+import com.github.auties00.cobalt.wire.core.message.*;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.*;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.PeerDataOperationRequestType;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.CommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.commerce.OrderMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.wire.linked.message.payment.PaymentInviteMessage;
+import com.github.auties00.cobalt.wire.linked.message.payment.RequestPaymentMessage;
+import com.github.auties00.cobalt.wire.linked.message.payment.SendPaymentMessage;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.payment.OrphanPaymentNotificationBuilder;
+import com.github.auties00.cobalt.wire.linked.payment.PaymentInfo;
+import com.github.auties00.cobalt.wire.linked.payment.PaymentInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdSnapshotRecovery;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.WebHistorySyncService;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
 import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.IncomingMessageDropEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdBadDeviceSentMessageEventBuilder;
-import com.github.auties00.cobalt.wam.event.MessageHighRetryCountEventBuilder;
-import com.github.auties00.cobalt.wam.event.MessageReceiveEventBuilder;
-import com.github.auties00.cobalt.wam.event.NonMessagePeerDataOperationResponseEventBuilder;
-import com.github.auties00.cobalt.wam.event.OfflineCountTooHighEventBuilder;
-import com.github.auties00.cobalt.wam.event.BusinessTemplateRichOrderStatusEventBuilder;
-import com.github.auties00.cobalt.wam.event.PlaceholderActivityEventBuilder;
-import com.github.auties00.cobalt.wam.event.PsRichOrderStatusMessageInconsistentPayloadReceivedEventBuilder;
-import com.github.auties00.cobalt.wam.event.StructuredMessageBuyerReceiveEventBuilder;
-import com.github.auties00.cobalt.wam.event.StructuredMessageReceiveEventBuilder;
-import com.github.auties00.cobalt.wam.event.UnknownStanzaEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcMessageProcessingPerfEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdBadDeviceSentMessageEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MessageHighRetryCountEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MessageReceiveEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.NonMessagePeerDataOperationResponseEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.OfflineCountTooHighEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.BusinessTemplateRichOrderStatusEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PlaceholderActivityEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PsRichOrderStatusMessageInconsistentPayloadReceivedEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.StructuredMessageBuyerReceiveEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.StructuredMessageReceiveEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.UnknownStanzaEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcMessageProcessingPerfEventBuilder;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingActivity;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingMessages;
-import com.github.auties00.cobalt.wam.type.BizPlatform;
-import com.github.auties00.cobalt.wam.type.ChatsFolderType;
-import com.github.auties00.cobalt.wam.type.ContactType;
-import com.github.auties00.cobalt.wam.type.PlaceholderAction;
-import com.github.auties00.cobalt.wam.type.PlaceholderChatType;
-import com.github.auties00.cobalt.wam.type.PlaceholderReasonType;
-import com.github.auties00.cobalt.wam.type.PlaceholderType;
-import com.github.auties00.cobalt.wam.type.StructuredMessageClass;
-import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
-import com.github.auties00.cobalt.wam.type.AddressingMode;
-import com.github.auties00.cobalt.wam.type.BotType;
-import com.github.auties00.cobalt.wam.type.ChatOriginsType;
-import com.github.auties00.cobalt.wam.type.DeviceType;
-import com.github.auties00.cobalt.wam.type.DisappearingChatInitiatorType;
-import com.github.auties00.cobalt.wam.type.DsmError;
-import com.github.auties00.cobalt.wam.type.E2eCiphertextType;
-import com.github.auties00.cobalt.wam.type.E2eDestination;
-import com.github.auties00.cobalt.wam.type.EditType;
-import com.github.auties00.cobalt.wam.type.EncryptionTypeCode;
-import com.github.auties00.cobalt.wam.type.EphemeralityInitiatorType;
-import com.github.auties00.cobalt.wam.type.EphemeralityTriggerActionType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageDropReasonType;
-import com.github.auties00.cobalt.wam.type.RevokeType;
-import com.github.auties00.cobalt.wam.type.StanzaType;
-import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
+import com.github.auties00.cobalt.wire.wam.type.BizPlatform;
+import com.github.auties00.cobalt.wire.wam.type.ChatsFolderType;
+import com.github.auties00.cobalt.wire.wam.type.ContactType;
+import com.github.auties00.cobalt.wire.wam.type.PlaceholderAction;
+import com.github.auties00.cobalt.wire.wam.type.PlaceholderChatType;
+import com.github.auties00.cobalt.wire.wam.type.PlaceholderReasonType;
+import com.github.auties00.cobalt.wire.wam.type.PlaceholderType;
+import com.github.auties00.cobalt.wire.wam.type.StructuredMessageClass;
+import com.github.auties00.cobalt.wire.wam.type.PeerDataRequestType;
+import com.github.auties00.cobalt.wire.wam.type.AddressingMode;
+import com.github.auties00.cobalt.wire.wam.type.BotType;
+import com.github.auties00.cobalt.wire.wam.type.ChatOriginsType;
+import com.github.auties00.cobalt.wire.wam.type.DeviceType;
+import com.github.auties00.cobalt.wire.wam.type.DisappearingChatInitiatorType;
+import com.github.auties00.cobalt.wire.wam.type.DsmError;
+import com.github.auties00.cobalt.wire.wam.type.E2eCiphertextType;
+import com.github.auties00.cobalt.wire.wam.type.E2eDestination;
+import com.github.auties00.cobalt.wire.wam.type.EditType;
+import com.github.auties00.cobalt.wire.wam.type.EncryptionTypeCode;
+import com.github.auties00.cobalt.wire.wam.type.EphemeralityInitiatorType;
+import com.github.auties00.cobalt.wire.wam.type.EphemeralityTriggerActionType;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MessageDropReasonType;
+import com.github.auties00.cobalt.wire.wam.type.RevokeType;
+import com.github.auties00.cobalt.wire.wam.type.StanzaType;
+import com.github.auties00.cobalt.wire.wam.type.TypeOfGroupEnum;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatDisappearingMode;
 
 import java.io.ByteArrayInputStream;
 import java.lang.System.Logger.Level;
@@ -230,7 +232,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Parses and decrypts the inbound stanza into the typed
-     * {@link MessageInfo} consumed by Cobalt downstream.
+     * {@link LinkedMessageInfo} consumed by Cobalt downstream.
      */
     private final MessageService messageService;
 
@@ -578,7 +580,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                     whatsapp.store().accountStore().lid().orElse(null));
         } catch (RuntimeException exception) {
             if (Log.WARNING) {
-                LOGGER.log(Level.WARNING, "failed to parse incoming message stanza from " + Log.jid(String.valueOf(from)), exception);
+                LOGGER.log(Level.WARNING, "failed to parse incoming message stanza from " + new LogRedactable.User(String.valueOf(from)), exception);
             }
             emitUnknownStanzaMetric(node);
             emitIncomingMessageDropFromNode(node, MessageDropReasonType.INVALID_STANZA);
@@ -673,7 +675,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * @implNote
      * This implementation converts a runtime exception during processing
      * into an
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent}
      * with {@link MessageDropReasonType#INVALID_PROTOBUF} and
      * {@link E2eDestination#CHANNEL}, matching the WA Web emission for a
      * {@code MessageValidationError} on the channel pipeline.
@@ -700,7 +702,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         } catch (RuntimeException exception) {
             if (Log.WARNING) {
                 var from = stanza.getAttributeAsJid("from").orElse(null);
-                LOGGER.log(Level.WARNING, "failed to handle newsletter message stanza from " + Log.jid(String.valueOf(from)), exception);
+                LOGGER.log(Level.WARNING, "failed to handle newsletter message stanza from " + new LogRedactable.User(String.valueOf(from)), exception);
             }
             wamService.commit(new IncomingMessageDropEventBuilder()
                     .messageDropReason(MessageDropReasonType.INVALID_PROTOBUF)
@@ -743,7 +745,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         if (errorCode != null) {
             if (Log.WARNING) {
                 LOGGER.log(Level.WARNING, "nack (" + errorCode + ") for message " + stanza.id()
-                        + " from " + Log.jid(String.valueOf(stanza.senderJid())), exception);
+                        + " from " + new LogRedactable.User(String.valueOf(stanza.senderJid())), exception);
             }
             receiptHandler.sendNackReceipt(stanza, parseErrorCode(errorCode));
             return;
@@ -814,7 +816,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         if (retryCount == MAX_MESSAGE_RETRY_COUNT) {
             if (Log.WARNING) {
                 LOGGER.log(Level.WARNING, "message id=" + stanza.id() + " from "
-                        + Log.jid(String.valueOf(stanza.senderJid())) + " still undecryptable after "
+                        + new LogRedactable.User(String.valueOf(stanza.senderJid())) + " still undecryptable after "
                         + retryCount + " retries", exception);
             }
             whatsapp.handleFailure(exception);
@@ -826,7 +828,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * message.
      *
      * <p>The placeholder carries the real message key (so a recovered retry overwrites it), an
-     * {@link MessageContainer#empty() empty} body, and {@link MessageStatus#ERROR} status.
+     * {@link LinkedMessageContainer#empty() empty} body, and {@link MessageStatus#ERROR} status.
      *
      * @implNote
      * This implementation derives {@code fromMe} by matching the sender's user JID against the
@@ -852,7 +854,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
         return new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.empty())
+                .message(LinkedMessageContainer.empty())
                 .timestamp(stanza.timestamp())
                 .status(MessageStatus.ERROR)
                 .senderJid(senderJid)
@@ -911,7 +913,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits an
-     * {@link com.github.auties00.cobalt.wam.event.OfflineCountTooHighEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.OfflineCountTooHighEvent}
      * when the parsed stanza carries an {@code offline} attribute at or above
      * {@link #OFFLINE_COUNT_TOO_HIGH_THRESHOLD}.
      *
@@ -991,7 +993,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * <p>Drives the {@code mediaType} property of every WAM metric that needs
      * to classify the inbound payload, including
-     * {@link com.github.auties00.cobalt.wam.event.OfflineCountTooHighEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.OfflineCountTooHighEvent}.
      * Reaction and medianotify stanza types win over poll types, poll
      * creation and vote win over the enc media type, and the enc media type
      * drives the remaining cases. Any unrecognised triple returns
@@ -1069,7 +1071,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits an
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent}
      * for a drop that occurred before the stanza could even be parsed into a
      * {@link MessageReceiveStanza}.
      *
@@ -1103,7 +1105,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits an
-     * {@link com.github.auties00.cobalt.wam.event.UnknownStanzaEvent} for a
+     * {@link com.github.auties00.cobalt.wire.wam.event.UnknownStanzaEvent} for a
      * stanza whose top-level shape did not parse.
      *
      * <p>Records the stanza tag and type so the server can detect bundles
@@ -1128,7 +1130,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits an
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent}
      * for a drop that occurred while processing an already-parsed stanza.
      *
      * <p>Mirrors the per-decrypt-slot drop telemetry WA Web emits when an
@@ -1211,7 +1213,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits an
-     * {@link com.github.auties00.cobalt.wam.event.MdBadDeviceSentMessageEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.MdBadDeviceSentMessageEvent}
      * when the current receive failure is a device-sent-message validation
      * error.
      *
@@ -1259,14 +1261,14 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent} for a
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent} for a
      * successfully decrypted E2E chat message.
      *
      * <p>Runs once per decrypted message in an incoming batch and carries the
      * typing, content, addressing, ephemerality, and timing metadata the
      * server uses to debug delivery and adoption regressions. After committing
      * the event it reports the receive to the ctlv2 thread-logging aggregator
-     * through {@link LinkedWhatsAppClient#recordThreadActivity(com.github.auties00.cobalt.model.jid.JidProvider, ThreadLoggingActivity)}
+     * through {@link LinkedWhatsAppClient#recordThreadActivity(com.github.auties00.cobalt.wire.core.jid.JidProvider, ThreadLoggingActivity)}
      * as a {@link ThreadLoggingActivity.MessageReceived}; protocol and system
      * messages are skipped.
      *
@@ -1394,7 +1396,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.StructuredMessageReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.StructuredMessageReceiveEvent}
      * when the inbound chat message is a galaxy-flow CTA or a payment-request
      * native-flow interactive message.
      *
@@ -1466,7 +1468,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.StructuredMessageReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.StructuredMessageReceiveEvent}
      * and its buyer-receive sibling for an inbound commerce structured message
      * that Cobalt detects from the decoded message content.
      *
@@ -1484,7 +1486,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * @implNote
      * This implementation classifies the message from its decoded content type
      * because Cobalt carries the order and payment payloads on typed
-     * {@link MessageContainer} content rather than on the stanza envelope. The
+     * {@link LinkedMessageContainer} content rather than on the stanza envelope. The
      * {@code messageClassAttributes}, {@code entryPoint*}, {@code templateId},
      * {@code messageDepth}, and {@code threadIdHmac} properties are left absent
      * because the WA Web helpers ({@code P2XFunnelIdGenerator.genFunnelInfo},
@@ -1537,7 +1539,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * @param container the decoded message container
      * @return {@code true} when the message is a commerce structured message
      */
-    private static boolean isCommerceStructuredMessage(MessageContainer container) {
+    private static boolean isCommerceStructuredMessage(LinkedMessageContainer container) {
         var content = container.content();
         return content instanceof OrderMessage
                 || content instanceof RequestPaymentMessage
@@ -1550,14 +1552,14 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * Tests whether a decoded message container is an interactive native-flow
      * message carrying a button with the given flow name.
      *
-     * <p>Backs {@link #isCommerceStructuredMessage(MessageContainer)} and
-     * {@link #orderStatusButtonJson(MessageContainer)}.
+     * <p>Backs {@link #isCommerceStructuredMessage(LinkedMessageContainer)} and
+     * {@link #orderStatusButtonJson(LinkedMessageContainer)}.
      *
      * @param container the decoded message container
      * @param flowName  the native-flow button name to match
      * @return {@code true} when a native-flow button with the name is present
      */
-    private static boolean isNativeFlow(MessageContainer container, String flowName) {
+    private static boolean isNativeFlow(LinkedMessageContainer container, String flowName) {
         if (!(container.content() instanceof InteractiveMessage interactive)) {
             return false;
         }
@@ -1574,7 +1576,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.StructuredMessageBuyerReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.StructuredMessageBuyerReceiveEvent}
      * for a buyer receiving a structured commerce message.
      *
      * <p>Fired alongside every {@link StructuredMessageReceiveEventBuilder}
@@ -1614,10 +1616,10 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * <p>Gated on {@link ABProp#UTILITY_ORDER_STATUS_LOGGING_ENABLED}. When the
      * message carries an {@code order_status} native-flow button this emits the
-     * {@link com.github.auties00.cobalt.wam.event.BusinessTemplateRichOrderStatusEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.BusinessTemplateRichOrderStatusEvent}
      * template telemetry and, when a previously received rich-order-status
      * message for the same chat exists as a reference, the
-     * {@link com.github.auties00.cobalt.wam.event.PsRichOrderStatusMessageInconsistentPayloadReceivedEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.PsRichOrderStatusMessageInconsistentPayloadReceivedEvent}
      * payload-consistency check.
      *
      * @param info   the decoded chat message info
@@ -1654,7 +1656,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * @return the {@code order_status} button JSON, or {@link Optional#empty()}
      *         when the message is not a rich-order-status card
      */
-    private static Optional<String> orderStatusButtonJson(MessageContainer container) {
+    private static Optional<String> orderStatusButtonJson(LinkedMessageContainer container) {
         if (!(container.content() instanceof InteractiveMessage interactive)) {
             return Optional.empty();
         }
@@ -1672,7 +1674,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.BusinessTemplateRichOrderStatusEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.BusinessTemplateRichOrderStatusEvent}
      * for a received rich-order-status business template message.
      *
      * <p>Carries the folder, contact, mute, read-receipt, and subscription
@@ -1681,7 +1683,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * @implNote
      * This implementation derives {@code businessJid} from the chat JID and
-     * {@code chatsFolderType}/{@code isMuted} from the stored {@link com.github.auties00.cobalt.model.chat.Chat};
+     * {@code chatsFolderType}/{@code isMuted} from the stored {@link com.github.auties00.cobalt.wire.linked.chat.Chat};
      * {@code contactType} is {@link ContactType#ENTERPRISE} for a
      * Facebook-hosted (Cloud API) business and {@link ContactType#SMB}
      * otherwise, and {@code isBizIntent} is always {@code true} because the
@@ -1721,7 +1723,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.PsRichOrderStatusMessageInconsistentPayloadReceivedEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.PsRichOrderStatusMessageInconsistentPayloadReceivedEvent}
      * when a newer rich-order-status card disagrees field-by-field with the
      * previously received card for the same chat.
      *
@@ -1863,7 +1865,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.PlaceholderActivityEvent} for
+     * {@link com.github.auties00.cobalt.wire.wam.event.PlaceholderActivityEvent} for
      * the insertion of the {@link ChatMessageInfo.StubType#CIPHERTEXT}
      * placeholder that stands in for an undecryptable message.
      *
@@ -1929,7 +1931,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * Maps a chat JID onto its WAM {@link PlaceholderChatType} bucket.
      *
      * <p>Drives the {@code placeholderChatTypeInd} property on the
-     * {@link com.github.auties00.cobalt.wam.event.PlaceholderActivityEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.PlaceholderActivityEvent}.
      *
      * @implNote
      * This implementation checks the JID flavours in the same order as WA Web's
@@ -1966,7 +1968,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * add reason.
      *
      * <p>Drives the {@code placeholderAddReason} property on the
-     * {@link com.github.auties00.cobalt.wam.event.PlaceholderActivityEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.PlaceholderActivityEvent}.
      *
      * @implNote
      * This implementation maps the Signal-level decrypt failures Cobalt
@@ -2009,7 +2011,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * Returns whether a parsed stanza carries a message revocation edit.
      *
      * <p>Drives the {@code messageIsRevoke} property on the
-     * {@link com.github.auties00.cobalt.wam.event.PlaceholderActivityEvent} when
+     * {@link com.github.auties00.cobalt.wire.wam.event.PlaceholderActivityEvent} when
      * the underlying message body is not yet decrypted.
      *
      * @param stanza the parsed inbound stanza
@@ -2043,11 +2045,11 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits an
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent} with
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent} with
      * {@link MessageDropReasonType#DB_OPERATION_FAILED} when persisting a
      * decoded message row fails.
      *
-     * <p>Emitted when {@link #storeIncomingMessage(MessageInfo)} throws while
+     * <p>Emitted when {@link #storeIncomingMessage(LinkedMessageInfo)} throws while
      * writing an already-decrypted message, mirroring WA Web's per-row drop for
      * a failed message persist.
      *
@@ -2086,7 +2088,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.WebcMessageProcessingPerfEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.WebcMessageProcessingPerfEvent}
      * carrying the per-stage processing durations of an inbound offline message.
      *
      * <p>Only offline messages contribute; live-delivered messages return
@@ -2157,7 +2159,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
     /**
      * Commits a
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent} for a
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent} for a
      * successfully processed newsletter message.
      *
      * <p>Populates only the properties Cobalt can derive for a newsletter
@@ -2209,16 +2211,16 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
     }
 
     /**
-     * Tests whether the decoded {@link MessageContainer} carries any of the
+     * Tests whether the decoded {@link LinkedMessageContainer} carries any of the
      * view-once wrappers WhatsApp ever shipped.
      *
      * <p>Drives the {@code isViewOnce} property on the WAM
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent}
      * builder.
      *
      * @implNote
      * This implementation delegates to
-     * {@link MessageContainer#futureProofContentType()} and checks for
+     * {@link LinkedMessageContainer#futureProofContentType()} and checks for
      * {@link FutureProofMessageType#VIEW_ONCE}, which folds the three
      * historical view-once message shapes ({@code viewOnceMessage},
      * {@code viewOnceMessageV2}, {@code viewOnceMessageV2Extension}) into one
@@ -2230,7 +2232,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgGetters", exports = "getIsViewOnce",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static boolean isViewOnceMessage(MessageContainer container) {
+    private static boolean isViewOnceMessage(LinkedMessageContainer container) {
         if (container == null) {
             return false;
         }
@@ -2239,12 +2241,12 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
     }
 
     /**
-     * Extracts the {@link ContextInfo} from a {@link MessageContainer} when
+     * Extracts the {@link ContextInfo} from a {@link LinkedMessageContainer} when
      * its content is a {@link ContextualMessage}.
      *
      * <p>Powers the {@code isForwardedForward}, {@code isAReply}, and
      * ephemerality fields on the WAM
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent}.
      *
      * @implNote
      * This implementation returns {@link Optional#empty()} when the container
@@ -2261,7 +2263,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebMsgGetters", exports = "getIsReply",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static Optional<ContextInfo> extractContextInfo(MessageContainer container) {
+    private static Optional<ContextInfo> extractContextInfo(LinkedMessageContainer container) {
         if (container == null) {
             return Optional.empty();
         }
@@ -2278,7 +2280,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * <p>Sets the {@code disappearingChatInitiator},
      * {@code ephemeralityTriggerAction}, and {@code ephemeralityInitiator}
      * properties on the WAM
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent}.
      *
      * @implNote
      * This implementation translates each Cobalt-side enum constant
@@ -2332,7 +2334,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * {@link ProtocolMessage.Type} subtype.
      *
      * <p>Drives the {@code editType} property on the
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent}.
      *
      * @implNote
      * This implementation checks the stanza's {@code edit} attribute first
@@ -2379,7 +2381,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * message is a revoke.
      *
      * <p>Drives the {@code revokeType} property on the
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent}.
      *
      * @implNote
      * This implementation routes the stanza's {@code edit} attribute to
@@ -2415,7 +2417,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * WAM {@link AddressingMode} counterpart.
      *
      * <p>Drives the {@code serverAddressingMode} property on the
-     * {@link com.github.auties00.cobalt.wam.event.MessageReceiveEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.MessageReceiveEvent}.
      *
      * @implNote
      * This implementation accepts only the two values WA Web emits
@@ -2446,7 +2448,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * <p>Backs {@link #emitIncomingMessageDropFromStanza}; the resolved reason
      * becomes the {@code messageDropReason} property of the committed
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent}.
      *
      * @implNote
      * This implementation reproduces three special cases in order:
@@ -2506,7 +2508,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * {@link E2eCiphertextType} counterpart.
      *
      * <p>Drives the {@code e2eCiphertextType} property on the
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent}.
      *
      * @param type the Signal-level ciphertext type lifted from the first
      *             {@code <enc>} child of the inbound stanza
@@ -2530,7 +2532,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * bucket.
      *
      * <p>Drives the {@code e2eDestination} property on the
-     * {@link com.github.auties00.cobalt.wam.event.IncomingMessageDropEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.IncomingMessageDropEvent}.
      *
      * @implNote
      * This implementation checks the chat-JID flavours in the same order as
@@ -2634,7 +2636,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
     }
 
     /**
-     * Persists a freshly processed inbound {@link MessageInfo} into the
+     * Persists a freshly processed inbound {@link LinkedMessageInfo} into the
      * appropriate store collection.
      *
      * <p>Routes the message to one of three buckets: newsletter messages land
@@ -2651,7 +2653,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * @param info the typed inbound message to persist
      */
-    private void storeIncomingMessage(MessageInfo info) {
+    private void storeIncomingMessage(LinkedMessageInfo info) {
         switch (info) {
             case NewsletterMessageInfo newsletterInfo -> {
                 var newsletterJid = newsletterInfo.key().parentJid().orElse(null);
@@ -2709,7 +2711,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * @param quotedMessage the message {@code info} quotes, or
      *                      {@link Optional#empty()} when none was resolved
      */
-    private void notifyMessageReceived(MessageInfo info, Optional<? extends MessageInfo> quotedMessage) {
+    private void notifyMessageReceived(LinkedMessageInfo info, Optional<? extends LinkedMessageInfo> quotedMessage) {
         var statusMessage = isStatusMessage(info);
         for (var listener : whatsapp.store().listeners()) {
             if (listener instanceof NewMessageListener typed) {
@@ -2731,15 +2733,15 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * <p>Used by {@link #storeIncomingMessage} to route status broadcasts to
      * the dedicated status collection rather than to a per-chat history, and
-     * by {@link #notifyMessageReceived(MessageInfo, Optional)} to decide
+     * by {@link #notifyMessageReceived(LinkedMessageInfo, Optional)} to decide
      * whether to fire {@code onNewStatus}.
      *
      * @param info the inbound message info
-     * @return {@code true} when the {@link MessageInfo}'s parent JID is the
+     * @return {@code true} when the {@link LinkedMessageInfo}'s parent JID is the
      *         status broadcast account; {@code false} otherwise, including
      *         when the parent JID is absent
      */
-    private boolean isStatusMessage(MessageInfo info) {
+    private boolean isStatusMessage(LinkedMessageInfo info) {
         return info.key()
                 .parentJid()
                 .map(Jid::isStatusBroadcastAccount)
@@ -2765,7 +2767,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      *
      * @param info the inbound message info
      */
-    private void resolveOrphanPayment(MessageInfo info) {
+    private void resolveOrphanPayment(LinkedMessageInfo info) {
         if (!(info instanceof ChatMessageInfo chatMessageInfo)) {
             return;
         }
@@ -2800,7 +2802,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * references and fan-broadcasts an {@code onMessageStatus} listener
      * callback. When the message cannot be located the transaction is
      * buffered as an orphan so that
-     * {@link #resolveOrphanPayment(MessageInfo)} can replay it later.
+     * {@link #resolveOrphanPayment(LinkedMessageInfo)} can replay it later.
      *
      * @implNote
      * This implementation derives {@code fromMe} from the sender JID compared
@@ -2885,7 +2887,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * @return the matching message info, or {@code null} when no message is
      *         found
      */
-    private MessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
+    private LinkedMessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
         var direct = whatsapp.store().chatStore().findMessageByKey(new MessageKeyBuilder()
                         .id(messageId)
                         .parentJid(remote)
@@ -2898,7 +2900,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         }
 
         return whatsapp.store().chatStore().findMessageById(remote, messageId)
-                .map(MessageInfo.class::cast)
+                .map(LinkedMessageInfo.class::cast)
                 .orElse(null);
     }
 
@@ -3271,7 +3273,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * companion device asks the primary for keys it is missing, this method
      * assembles a peer protocol message containing the subset of requested
      * keys that the local store knows about and dispatches it via
-     * {@link LinkedWhatsAppClient#sendPeerMessage(com.github.auties00.cobalt.model.jid.JidProvider, ChatMessageInfo)}.
+     * {@link LinkedWhatsAppClient#sendPeerMessage(com.github.auties00.cobalt.wire.core.jid.JidProvider, ChatMessageInfo)}.
      *
      * @implNote
      * This implementation packs a placeholder entry with just the key id when
@@ -3322,7 +3324,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                     .type(ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE)
                     .appStateSyncKeyShare(keyShare)
                     .build();
-            var messageContainer = new MessageContainerBuilder()
+            var messageContainer = new LinkedMessageContainerBuilder()
                     .protocolMessage(protocolMessage)
                     .build();
             var self = whatsapp.store().accountStore().jid().orElse(null);
@@ -3350,7 +3352,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         } catch (Throwable throwable) {
             if (Log.DEBUG) {
                 LOGGER.log(Level.DEBUG, "failed to answer app state sync key request from "
-                        + Log.jid(String.valueOf(sender.orElse(null))), throwable);
+                        + new LogRedactable.User(String.valueOf(sender.orElse(null))), throwable);
             }
         }
     }
@@ -3365,7 +3367,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      * {@link SnapshotRecoveryService#resolveRecovery(SyncPatchType, SyncdSnapshotRecovery)}
      * so the consumer blocked on the recovery promise in
      * {@link WebAppStateService} receives the result. A
-     * {@link com.github.auties00.cobalt.wam.event.NonMessagePeerDataOperationResponseEvent}
+     * {@link com.github.auties00.cobalt.wire.wam.event.NonMessagePeerDataOperationResponseEvent}
      * is committed in both the success and decode-failure paths. Responses for
      * other request types or responses received while recovery is disabled are
      * silently dropped.

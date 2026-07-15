@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.store.linked;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.contact.ContactTextStatus;
-import com.github.auties00.cobalt.model.contact.OutContact;
-import com.github.auties00.cobalt.model.device.capabilities.DeviceCapabilities;
-import com.github.auties00.cobalt.model.device.capabilities.DeviceCapabilitiesEntry;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
+import com.github.auties00.cobalt.wire.linked.business.BusinessVerifiedName;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatus;
+import com.github.auties00.cobalt.wire.linked.contact.OutContact;
+import com.github.auties00.cobalt.wire.linked.device.capabilities.DeviceCapabilities;
+import com.github.auties00.cobalt.wire.linked.device.capabilities.DeviceCapabilitiesEntry;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceList;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
 
 import java.time.Instant;
 import java.util.Collection;

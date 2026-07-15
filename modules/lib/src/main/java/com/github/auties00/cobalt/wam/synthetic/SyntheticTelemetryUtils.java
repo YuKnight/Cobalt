@@ -26,21 +26,21 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>The range and probability helpers draw from
  * {@link ThreadLocalRandom#current()} rather than the shared
  * {@code SecureRandom} behind
- * {@link com.github.auties00.cobalt.util.DataUtils}. Synthetic telemetry emits a
+ * {@link com.github.auties00.cobalt.wire.core.util.DataUtils}. Synthetic telemetry emits a
  * high volume of unimportant fabricated numbers on every connect, and none of
  * those figures is a secret; routing them through the strong entropy source
  * would contend on it needlessly, so this holder keeps them on the fast
  * per-thread generator. The two hashing helpers exist because
  * {@code DataUtils} exposes no digest primitive, and {@link #randomHexLower(int)}
- * exists because {@link com.github.auties00.cobalt.util.DataUtils#randomHex(int)}
+ * exists because {@link com.github.auties00.cobalt.wire.core.util.DataUtils#randomHex(int)}
  * emits <em>uppercase</em> hex, whereas the ids WhatsApp Web mints for these
  * surfaces are lowercase.
  *
  * <p>This holder intentionally offers no plain exclusive-bound integer or long
  * range wrapper: where a caller needs a plain {@code [0, bound)} or
  * {@code [min, max)} draw, it should call
- * {@link com.github.auties00.cobalt.util.DataUtils#randomInt(int, int)} or
- * {@link com.github.auties00.cobalt.util.DataUtils#randomLong(long, long)}
+ * {@link com.github.auties00.cobalt.wire.core.util.DataUtils#randomInt(int, int)} or
+ * {@link com.github.auties00.cobalt.wire.core.util.DataUtils#randomLong(long, long)}
  * directly rather than add a wrapper here. The helpers below cover only the
  * inclusive-bound and hash-shaped idioms {@code DataUtils} does not already
  * express.
@@ -52,7 +52,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * noise, not cryptographic material, so the weaker but contention-free source is
  * the correct choice.
  *
- * @see com.github.auties00.cobalt.util.DataUtils
+ * @see com.github.auties00.cobalt.wire.core.util.DataUtils
  */
 public final class SyntheticTelemetryUtils {
     /**
@@ -89,7 +89,7 @@ public final class SyntheticTelemetryUtils {
      * Returns a uniformly random {@code long} in the inclusive range
      * {@code [min, max]}.
      *
-     * <p>Unlike {@link com.github.auties00.cobalt.util.DataUtils#randomLong(long, long)},
+     * <p>Unlike {@link com.github.auties00.cobalt.wire.core.util.DataUtils#randomLong(long, long)},
      * whose upper bound is exclusive, this helper includes {@code max} so callers
      * can express a closed interval directly.
      *
@@ -105,7 +105,7 @@ public final class SyntheticTelemetryUtils {
      * Returns a uniformly random {@code int} in the inclusive range
      * {@code [lo, hi]}.
      *
-     * <p>Unlike {@link com.github.auties00.cobalt.util.DataUtils#randomInt(int, int)},
+     * <p>Unlike {@link com.github.auties00.cobalt.wire.core.util.DataUtils#randomInt(int, int)},
      * whose upper bound is exclusive, this helper includes {@code hi} so callers
      * can express a closed count interval directly.
      *
@@ -144,7 +144,7 @@ public final class SyntheticTelemetryUtils {
      * offline-session ids, opaque digests), which are lowercase.
      *
      * <p>This helper exists rather than delegating to
-     * {@link com.github.auties00.cobalt.util.DataUtils#randomHex(int)} because that
+     * {@link com.github.auties00.cobalt.wire.core.util.DataUtils#randomHex(int)} because that
      * method emits uppercase hex (matching WhatsApp's {@code WAHex.toHex}), whereas
      * these synthetic surfaces mint their ids in lowercase; the two are not
      * interchangeable on the wire.

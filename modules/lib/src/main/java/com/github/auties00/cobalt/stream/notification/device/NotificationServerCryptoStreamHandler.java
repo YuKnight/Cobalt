@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -8,23 +8,24 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedDeviceIdentityChangedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedRegistrationCodeListener;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.media.MediaRetryNotificationSpec;
-import com.github.auties00.cobalt.model.message.MessageInfo;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceList;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.wire.linked.media.MediaRetryNotificationSpec;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.SenderKeyExpiredEvent;
-import com.github.auties00.cobalt.wam.event.SenderKeyExpiredEventBuilder;
-import com.github.auties00.cobalt.wam.event.WaOldCodeEventBuilder;
-import com.github.auties00.cobalt.wam.type.ExpiryReason;
-import com.github.auties00.cobalt.wam.type.MessageChatType;
-import com.github.auties00.cobalt.wam.type.SizeBucket;
+import com.github.auties00.cobalt.wire.wam.event.SenderKeyExpiredEvent;
+import com.github.auties00.cobalt.wire.wam.event.SenderKeyExpiredEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WaOldCodeEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ExpiryReason;
+import com.github.auties00.cobalt.wire.wam.type.MessageChatType;
+import com.github.auties00.cobalt.wire.wam.type.SizeBucket;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -522,9 +523,9 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
         try {
             var numericCode = Long.parseLong(code);
             fireListeners(LinkedRegistrationCodeListener.class, listener -> listener.onRegistrationCode(whatsapp, numericCode));
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delivered device-switch registration code {0}", Log.code(code));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delivered device-switch registration code {0}", new LogRedactable.Code(code));
         } catch (NumberFormatException exception) {
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring non-numeric device-switch code {0}", Log.code(code));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring non-numeric device-switch code {0}", new LogRedactable.Code(code));
         }
 
         var meDeviceId = whatsapp.store().accountStore().jid()
@@ -563,9 +564,9 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
      * matches in any of the three collections.
      *
      * @param id the stanza identifier
-     * @return the matching {@link MessageInfo}, or {@code null} when not found
+     * @return the matching {@link LinkedMessageInfo}, or {@code null} when not found
      */
-    private MessageInfo findMessageById(String id) {
+    private LinkedMessageInfo findMessageById(String id) {
         if (id == null) {
             return null;
         }

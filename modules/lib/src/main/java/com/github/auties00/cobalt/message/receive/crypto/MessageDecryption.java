@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.receive.crypto;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
@@ -9,8 +9,8 @@ import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.SecretMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.SecretMessageContainerSpec;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.exception.*;
@@ -611,7 +611,7 @@ public final class MessageDecryption {
      * {@link #processSenderKeyDistribution(Jid, Jid, SignalSenderKeyDistributionMessage)}.
      *
      * <p>This overload accepts the raw distribution-message bytes extracted from the
-     * decrypted {@code MessageContainer}.
+     * decrypted {@code LinkedMessageContainer}.
      *
      * @param groupJid         the group JID
      * @param senderJid        the sender's device JID

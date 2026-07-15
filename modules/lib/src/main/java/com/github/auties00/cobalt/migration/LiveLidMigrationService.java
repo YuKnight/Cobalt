@@ -2,34 +2,35 @@ package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppLidMigrationException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMute;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.sync.history.HistorySync;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMapping;
-import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayload;
-import com.github.auties00.cobalt.model.jid.migration.PhoneNumberToLIDMapping;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.setting.GlobalSettings;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatDisappearingMode;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMute;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.linked.sync.history.HistorySync;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMapping;
+import com.github.auties00.cobalt.wire.linked.jid.migration.LIDMigrationMappingSyncPayload;
+import com.github.auties00.cobalt.wire.linked.jid.migration.PhoneNumberToLIDMapping;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.setting.GlobalSettings;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
-import com.github.auties00.cobalt.wam.event.LidMigrationDailyEventBuilder;
-import com.github.auties00.cobalt.wam.type.LidMigrationSourceType;
-import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
-import com.github.auties00.cobalt.wam.type.StageFailureReasonEnum;
+import com.github.auties00.cobalt.wire.wam.event.Lid11MigrationLifecycleEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.LidMigrationDailyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.LidMigrationSourceType;
+import com.github.auties00.cobalt.wire.wam.type.MigrationStageEnum;
+import com.github.auties00.cobalt.wire.wam.type.StageFailureReasonEnum;
 
 import com.github.auties00.cobalt.util.ScheduledTask;
 
@@ -1456,7 +1457,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
                 }
             } catch (Throwable throwable) {
                 if (Log.ERROR) LOGGER.log(Level.ERROR,
-                        "error executing resolution for " + Log.jid(String.valueOf(resolution.originalJid())), throwable);
+                        "error executing resolution for " + new LogRedactable.User(String.valueOf(resolution.originalJid())), throwable);
             }
         }
     }

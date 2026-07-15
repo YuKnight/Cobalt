@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.registration.push.fcm;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.registration.push.fcm.checkin.*;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.push.fcm.checkin.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

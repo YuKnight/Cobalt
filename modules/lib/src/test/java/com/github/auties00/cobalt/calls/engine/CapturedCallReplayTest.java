@@ -12,11 +12,11 @@ import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
 import com.github.auties00.cobalt.calls.signaling.session.PreacceptStanza;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
 import com.github.auties00.cobalt.calls.signaling.session.TransportStanza;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallState;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -346,7 +346,7 @@ class CapturedCallReplayTest {
 
     /**
      * Drives one call through the transition guard, mirroring the lifecycle controller's transition step:
-     * it runs the guard, mirrors the public projection onto the {@link com.github.auties00.cobalt.model.call.Call}
+     * it runs the guard, mirrors the public projection onto the {@link com.github.auties00.cobalt.wire.linked.call.Call}
      * view, and records the emitted events the way the controller would, so the captured CallState and
      * event sequence are asserted without the controller's untestable host/crypto dependencies.
      */

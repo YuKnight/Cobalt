@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageBodyBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageFooterBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageInteractiveHeaderBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageNativeFlowMessageBuilder;
-import com.github.auties00.cobalt.model.message.interactive.NativeFlowMessageInteractiveMessageNativeFlowButtonBuilder;
-import com.github.auties00.cobalt.model.message.media.ImageMessageBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageBodyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageFooterBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageInteractiveHeaderBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageNativeFlowMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.NativeFlowMessageInteractiveMessageNativeFlowButtonBuilder;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessageBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -19,14 +19,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * Outbound mapping cells for {@link CloudMessageEncoder}: each cell builds a {@link MessageContainer}
+ * Outbound mapping cells for {@link CloudMessageEncoder}: each cell builds a {@link LinkedMessageContainer}
  * and asserts the produced Cloud {@code interactive} stanza against the Meta documented shape.
  */
 @DisplayName("CloudMessageEncoder")
 class CloudMessageEncoderTest {
     private static final Jid RECIPIENT = Jid.of("15551234567");
 
-    private static JSONObject interactive(MessageContainer container) {
+    private static JSONObject interactive(LinkedMessageContainer container) {
         return CloudMessageEncoder.encode(RECIPIENT, container).getJSONObject("interactive");
     }
 
@@ -45,7 +45,7 @@ class CloudMessageEncoderTest {
                 .nativeFlowMessage(flow)
                 .build();
 
-        var node = interactive(MessageContainer.of(interactive));
+        var node = interactive(LinkedMessageContainer.of(interactive));
         assertEquals("cta_url", node.getString("type"));
         assertEquals("Tap below to view your receipt", node.getJSONObject("body").getString("text"));
         assertEquals("Acme Inc", node.getJSONObject("footer").getString("text"));
@@ -71,7 +71,7 @@ class CloudMessageEncoderTest {
                 .nativeFlowMessage(flow)
                 .build();
 
-        var node = interactive(MessageContainer.of(interactive));
+        var node = interactive(LinkedMessageContainer.of(interactive));
         assertEquals("flow", node.getString("type"));
         var parameters = node.getJSONObject("action").getJSONObject("parameters");
         assertEquals("flow", node.getJSONObject("action").getString("name"));
@@ -97,7 +97,7 @@ class CloudMessageEncoderTest {
                 .nativeFlowMessage(flow)
                 .build();
 
-        var node = interactive(MessageContainer.of(interactive));
+        var node = interactive(LinkedMessageContainer.of(interactive));
         assertEquals("image", node.getJSONObject("header").getString("type"));
         assertEquals("https://example.com/hero.jpg", node.getJSONObject("header").getJSONObject("image").getString("link"));
     }
@@ -114,7 +114,7 @@ class CloudMessageEncoderTest {
                 .nativeFlowMessage(flow)
                 .build();
 
-        var node = interactive(MessageContainer.of(interactive));
+        var node = interactive(LinkedMessageContainer.of(interactive));
         assertEquals("location_request_message", node.getString("type"));
         assertEquals("send_location", node.getJSONObject("action").getString("name"));
         assertEquals("Please share your delivery location.", node.getJSONObject("body").getString("text"));
@@ -133,7 +133,7 @@ class CloudMessageEncoderTest {
                 .nativeFlowMessage(flow)
                 .build();
 
-        var node = interactive(MessageContainer.of(interactive));
+        var node = interactive(LinkedMessageContainer.of(interactive));
         assertEquals("address_message", node.getString("type"));
         assertEquals("address_message", node.getJSONObject("action").getString("name"));
         var parameters = node.getJSONObject("action").getJSONObject("parameters");

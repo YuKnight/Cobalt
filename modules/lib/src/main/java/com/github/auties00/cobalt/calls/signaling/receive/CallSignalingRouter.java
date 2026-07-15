@@ -4,9 +4,9 @@ import com.github.auties00.cobalt.calls.signaling.CallStanza;
 import com.github.auties00.cobalt.calls.signaling.SignalingType;
 import com.github.auties00.cobalt.calls.signaling.incall.RaiseHandStanza;
 import com.github.auties00.cobalt.calls.signaling.session.RingingStanza;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

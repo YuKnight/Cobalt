@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.engine.control.event;
 
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
-import com.github.auties00.cobalt.model.call.CallLink;
+import com.github.auties00.cobalt.wire.linked.call.CallLink;
 
 import java.util.Objects;
 

@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.sync.key;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wire.wam.type.BootstrapAppStateDataStageCode;
 
 import java.util.List;
 

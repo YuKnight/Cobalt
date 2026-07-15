@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.sync.key;
 
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyDataBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKey;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyDataBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.AppStateSyncKeyIdBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

@@ -3,17 +3,18 @@ package com.github.auties00.cobalt.props;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppABPropException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppServerRuntimeException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.WefrClientExposureEventBuilder;
-import com.github.auties00.cobalt.wam.event.WefrGroupClientExposureEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WefrClientExposureEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WefrGroupClientExposureEventBuilder;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;
@@ -872,7 +873,7 @@ public final class LiveABPropsService implements ABPropsService {
             return Optional.of(result);
         } catch (WhatsAppServerRuntimeException e) {
             if (Log.WARNING) {
-                LOGGER.log(Level.WARNING, "get group ab props protocol failed for " + Log.jid(String.valueOf(groupJid)), e);
+                LOGGER.log(Level.WARNING, "get group ab props protocol failed for " + new LogRedactable.User(String.valueOf(groupJid)), e);
             }
             return Optional.empty();
         }
@@ -1192,7 +1193,7 @@ public final class LiveABPropsService implements ABPropsService {
     }
 
     /**
-     * Emits the daily {@link com.github.auties00.cobalt.wam.event.WefrClientExposureEvent} pulse.
+     * Emits the daily {@link com.github.auties00.cobalt.wire.wam.event.WefrClientExposureEvent} pulse.
      *
      * <p>Re-emits the combined client exposure key with the {@code sentWithDaily} flag set, so the
      * WAM server observes a once-per-day exposure beacon alongside the private-stats heartbeat in
@@ -1212,7 +1213,7 @@ public final class LiveABPropsService implements ABPropsService {
     }
 
     /**
-     * Commits a {@link com.github.auties00.cobalt.wam.event.WefrClientExposureEvent} carrying the
+     * Commits a {@link com.github.auties00.cobalt.wire.wam.event.WefrClientExposureEvent} carrying the
      * combined client exposure key.
      *
      * <p>Backs both the real-time client-exposure pulse WA Web fires from
@@ -1245,7 +1246,7 @@ public final class LiveABPropsService implements ABPropsService {
     }
 
     /**
-     * Commits a {@link com.github.auties00.cobalt.wam.event.WefrGroupClientExposureEvent} for the
+     * Commits a {@link com.github.auties00.cobalt.wire.wam.event.WefrGroupClientExposureEvent} for the
      * resolved group props.
      *
      * <p>Mirrors the debounced per-group exposure pulse WA Web fires from

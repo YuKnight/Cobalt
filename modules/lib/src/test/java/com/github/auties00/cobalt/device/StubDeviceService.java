@@ -2,12 +2,12 @@ package com.github.auties00.cobalt.device;
 
 import com.github.auties00.cobalt.device.icdc.HostedIcdcResult;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
-import com.github.auties00.cobalt.model.device.DeviceListMetadata;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.device.DeviceListMetadata;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentity;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceList;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.time.Instant;
 import java.util.Collection;

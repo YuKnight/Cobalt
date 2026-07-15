@@ -8,31 +8,32 @@ import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 
 import com.github.auties00.cobalt.listener.linked.*;
 
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.integrity.IntegrityChallenge;
-import com.github.auties00.cobalt.model.call.CallInteraction;
-import com.github.auties00.cobalt.model.call.JoinableCallLink;
-import com.github.auties00.cobalt.model.call.IncomingCall;
-import com.github.auties00.cobalt.model.call.CallPeerState;
-import com.github.auties00.cobalt.model.call.CallScreenShareState;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.integrity.IntegrityChallenge;
+import com.github.auties00.cobalt.wire.linked.call.CallInteraction;
+import com.github.auties00.cobalt.wire.linked.call.JoinableCallLink;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
+import com.github.auties00.cobalt.wire.linked.call.CallPeerState;
+import com.github.auties00.cobalt.wire.linked.call.CallScreenShareState;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
-import com.github.auties00.cobalt.model.business.BusinessDataSharingConsent;
-import com.github.auties00.cobalt.model.business.ctwa.CtwaAccessTokenSession;
-import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSession;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.group.GroupPastParticipant;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.contact.ContactTextStatus;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.privacy.AccountDisappearingMode;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingValue;
-import com.github.auties00.cobalt.model.privacy.StatusPrivacySetting;
-import com.github.auties00.cobalt.model.setting.privacy.OptOutEntry;
-import com.github.auties00.cobalt.model.sync.action.SyncAction;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.business.BusinessDataSharingConsent;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaAccessTokenSession;
+import com.github.auties00.cobalt.wire.linked.business.webgraphql.WhatsAppWebGraphQlSession;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupPastParticipant;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatus;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.privacy.AccountDisappearingMode;
+import com.github.auties00.cobalt.wire.linked.privacy.PrivacySettingValue;
+import com.github.auties00.cobalt.wire.linked.privacy.StatusPrivacySetting;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.OptOutEntry;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncAction;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.Collection;
 import java.util.List;
@@ -199,7 +200,7 @@ public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener,
     }
 
     @Override
-    default void onMessageReply(LinkedWhatsAppClient whatsapp, MessageInfo response, MessageInfo quoted) {
+    default void onMessageReply(LinkedWhatsAppClient whatsapp, LinkedMessageInfo response, LinkedMessageInfo quoted) {
     }
 
     @Override

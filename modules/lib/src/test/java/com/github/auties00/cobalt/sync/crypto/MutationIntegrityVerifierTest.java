@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.sync.crypto;
 
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.signal.KeyId;
-import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.SyncdPatchBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdVersion;
-import com.github.auties00.cobalt.model.sync.data.SyncdVersionBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.signal.KeyId;
+import com.github.auties00.cobalt.wire.linked.signal.KeyIdBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdPatchBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdSnapshotBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdVersion;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdVersionBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import org.junit.jupiter.api.BeforeEach;

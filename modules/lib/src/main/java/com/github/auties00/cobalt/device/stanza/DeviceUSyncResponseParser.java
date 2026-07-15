@@ -1,16 +1,16 @@
 package com.github.auties00.cobalt.device.stanza;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.DeviceConstants;
+import com.github.auties00.cobalt.wire.linked.device.DeviceConstants;
 import com.github.auties00.cobalt.device.DeviceListResult;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
-import com.github.auties00.cobalt.model.device.info.DeviceInfo;
-import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceInfo;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceListBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;

@@ -1,31 +1,31 @@
 package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.appstate.*;
-import com.github.auties00.cobalt.model.sync.SyncCollectionState;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.appstate.*;
+import com.github.auties00.cobalt.wire.linked.sync.SyncCollectionState;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.SyncdCoordinator;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MdAppStateKeyRotationEventBuilder;
-import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
-import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
-import com.github.auties00.cobalt.wam.type.MdAppStateKeyRotationReasonCode;
+import com.github.auties00.cobalt.wire.wam.event.MdAppStateKeyRotationEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.BootstrapAppStateDataStageCode;
+import com.github.auties00.cobalt.wire.wam.type.MdAppStateKeyRotationReasonCode;
 
 import java.lang.System.Logger.Level;
 import java.security.SecureRandom;
@@ -668,7 +668,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
                 .appStateSyncKeyShare(keyShare)
                 .build();
 
-        var messageContainer = new MessageContainerBuilder()
+        var messageContainer = new LinkedMessageContainerBuilder()
                 .protocolMessage(protocolMessage)
                 .build();
 

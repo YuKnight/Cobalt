@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 /**
  * Covers the outgoing-mutation wire shape of {@link PaymentTosMutationFactory}.
  * Full byte-equality would require a fully populated
- * {@link com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction}
+ * {@link com.github.auties00.cobalt.wire.linked.sync.action.payment.PaymentTosAction}
  * that the corpus capture does not yet emit, so this suite stops at confirming the
  * oracle loads when present and returns early when its fixture is absent.
  */

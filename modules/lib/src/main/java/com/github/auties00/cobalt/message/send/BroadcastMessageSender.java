@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
@@ -16,21 +16,21 @@ import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.BroadcastListParticipant;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BroadcastListParticipant;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
-import com.github.auties00.cobalt.wam.type.SizeBucket;
+import com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wire.wam.type.SizeBucket;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -42,7 +42,7 @@ import java.util.Objects;
  * {@code <id>@broadcast}.
  *
  * <p>A broadcast list is a client-only saved audience: the roster lives on
- * {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList} and
+ * {@link com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList} and
  * never round-trips through server-side group metadata. The wire shape is
  * otherwise identical to a status broadcast: a sender-key (SKMSG) ciphertext
  * targeted at the synthetic broadcast JID, accompanied by per-recipient
@@ -51,22 +51,22 @@ import java.util.Objects;
  * devices that already hold a previously distributed key).
  *
  * <p>Embedders reach this sender through
- * {@link LinkedWhatsAppClient#sendBroadcast(com.github.auties00.cobalt.model.jid.JidProvider, MessageContainer)};
+ * {@link LinkedWhatsAppClient#sendBroadcast(com.github.auties00.cobalt.wire.core.jid.JidProvider, LinkedMessageContainer)};
  * the routing on
- * {@link MessageSendingService#send(com.github.auties00.cobalt.model.message.MessageInfo)}
+ * {@link MessageSendingService#send(com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo)}
  * keys on the broadcast-server JID.
  *
  * @implNote
  * This implementation mirrors {@link StatusMessageSender}'s SKMSG flow verbatim
  * with two divergences: the recipient list is resolved from the local
- * {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList} roster
+ * {@link com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList} roster
  * (rather than from the user's status privacy preferences), and the
  * {@code <meta>} child is built without a {@code status_setting} attribute
  * (which is meaningful only for status broadcasts). Cobalt does not create
  * per-recipient {@link ChatMessageInfo} clones the way WA Web's
  * {@code buildBroadcastMsgModelsFromMsgData} does: per-recipient delivery state
  * is carried on the existing
- * {@link com.github.auties00.cobalt.model.message.MessageReceipt} records created
+ * {@link com.github.auties00.cobalt.wire.linked.message.MessageReceipt} records created
  * via
  * {@link LinkedWhatsAppStore#createOrMergeReceiptRecords(String, java.util.Collection)},
  * which collapses WA Web's per-clone {@code ackLevel} into the Cobalt-uniform
@@ -214,7 +214,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
             skExistingDevices.clear();
         }
 
-        var plaintext = MessageContainerSpec.encode(container);
+        var plaintext = LinkedMessageContainerSpec.encode(container);
         var skmsgPayload = encryption.encryptForGroup(broadcastJid, selfJid, plaintext);
         var senderKeyBytes = encryption.getSenderKeyBytes(broadcastJid, selfJid);
 
@@ -289,7 +289,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
     /**
      * Resolves the recipient user JIDs for the given broadcast list JID by
      * looking up the local
-     * {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList}
+     * {@link com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList}
      * roster.
      *
      * <p>The broadcast list is the source of truth for who receives the
@@ -405,7 +405,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
 
     /**
      * Commits one
-     * {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * {@link com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEvent} per
      * depleted one-time pre-key reported by the last
      * {@link DeviceService#ensureSessions(java.util.Collection)} call.
      *

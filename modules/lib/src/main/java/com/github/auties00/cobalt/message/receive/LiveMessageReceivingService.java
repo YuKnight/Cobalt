@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.message.receive;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.dedup.MessageDedup;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
 
@@ -102,7 +102,7 @@ public final class LiveMessageReceivingService implements MessageReceivingServic
     @WhatsAppWebExport(moduleName = "WAWebHandleMsg", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public MessageInfo process(Stanza stanza) {
+    public LinkedMessageInfo process(Stanza stanza) {
         Objects.requireNonNull(stanza, "node");
 
         var fromJid = stanza.getRequiredAttributeAsJid("from");

@@ -1,12 +1,13 @@
 package com.github.auties00.cobalt.message.dedup;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveEncryptedPayload;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.lang.System.Logger.Level;
@@ -112,7 +113,7 @@ public final class MessageDedup {
         var newCount = pending.merge(key, 1, Integer::sum);
 
         if (Log.DEBUG) {
-            LOGGER.log(Level.DEBUG, "dedup add message key={0} total={1}", Log.jid(key), newCount);
+            LOGGER.log(Level.DEBUG, "dedup add message key={0} total={1}", new LogRedactable.User(key), newCount);
         }
 
         return newCount;
@@ -163,7 +164,7 @@ public final class MessageDedup {
         }
 
         if (Log.DEBUG) {
-            LOGGER.log(Level.DEBUG, "dedup pending hit key={0} total={1}", Log.jid(key), count);
+            LOGGER.log(Level.DEBUG, "dedup pending hit key={0} total={1}", new LogRedactable.User(key), count);
         }
         return true;
     }
@@ -248,7 +249,7 @@ public final class MessageDedup {
         });
 
         if (Log.TRACE) {
-            LOGGER.log(Level.TRACE, "dedup remove key={0} remaining={1}", Log.jid(key), remaining);
+            LOGGER.log(Level.TRACE, "dedup remove key={0} remaining={1}", new LogRedactable.User(key), remaining);
         }
     }
 

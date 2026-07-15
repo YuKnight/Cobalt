@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.media.transcode.document;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.message.media.DocumentMessage;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.wire.linked.message.media.DocumentMessage;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;

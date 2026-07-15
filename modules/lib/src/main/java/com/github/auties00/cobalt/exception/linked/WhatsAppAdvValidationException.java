@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.exception.linked;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.Objects;
 import java.util.Optional;

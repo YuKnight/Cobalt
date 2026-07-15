@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.message.send.icdc;
 
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.device.icdc.TestIcdcResults;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
-import com.github.auties00.cobalt.model.message.MessageContainer;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * shape: both ICDC inputs {@code null} (no-op, original container returned),
  * sender-only, recipient-only, both populated, all-empty ICDC values, and a
  * merge over a pre-existing
- * {@link com.github.auties00.cobalt.model.chat.ChatMessageContextInfo} carrying
+ * {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo} carrying
  * a {@code messageSecret}. {@link TestIcdcResults} fixture helpers mint
  * {@link com.github.auties00.cobalt.device.icdc.IcdcResult} instances directly,
  * isolating the enricher from {@link com.github.auties00.cobalt.device.DeviceService}
@@ -37,7 +37,7 @@ class IcdcEnricherTest {
     @Test
     @DisplayName("both ICDC null: container is returned unchanged (no-op)")
     void bothNullReturnsSameContainer() {
-        var original = MessageContainer.of("hello");
+        var original = LinkedMessageContainer.of("hello");
         var result = IcdcEnricher.enrich(original, null, null);
         assertSame(original, result,
                 "no ICDC inputs must return the container by reference");
@@ -48,7 +48,7 @@ class IcdcEnricherTest {
     void senderOnly() {
         var senderIcdc = TestIcdcResults.create(
                 SENDER_KEY_HASH, SENDER_TS, List.of(0, 73, 79), ADVEncryptionType.E2EE);
-        var enriched = IcdcEnricher.enrich(MessageContainer.of("hi"), senderIcdc, null);
+        var enriched = IcdcEnricher.enrich(LinkedMessageContainer.of("hi"), senderIcdc, null);
 
         var ctx = enriched.messageContextInfo().orElseThrow();
         var meta = ctx.deviceListMetadata().orElseThrow();
@@ -70,7 +70,7 @@ class IcdcEnricherTest {
     void recipientOnly() {
         var recipientIcdc = TestIcdcResults.create(
                 RECIPIENT_KEY_HASH, RECIPIENT_TS, List.of(0), ADVEncryptionType.E2EE);
-        var enriched = IcdcEnricher.enrich(MessageContainer.of("hi"), null, recipientIcdc);
+        var enriched = IcdcEnricher.enrich(LinkedMessageContainer.of("hi"), null, recipientIcdc);
 
         var meta = enriched.messageContextInfo().orElseThrow().deviceListMetadata().orElseThrow();
 
@@ -87,7 +87,7 @@ class IcdcEnricherTest {
     void bothPopulated() {
         var senderIcdc = TestIcdcResults.create(SENDER_KEY_HASH, SENDER_TS, List.of(0, 73), null);
         var recipientIcdc = TestIcdcResults.create(RECIPIENT_KEY_HASH, RECIPIENT_TS, List.of(0), null);
-        var enriched = IcdcEnricher.enrich(MessageContainer.of("hi"), senderIcdc, recipientIcdc);
+        var enriched = IcdcEnricher.enrich(LinkedMessageContainer.of("hi"), senderIcdc, recipientIcdc);
 
         var meta = enriched.messageContextInfo().orElseThrow().deviceListMetadata().orElseThrow();
         assertArrayEquals(SENDER_KEY_HASH, meta.senderKeyHash().orElseThrow());
@@ -101,7 +101,7 @@ class IcdcEnricherTest {
     @Test
     @DisplayName("empty ICDC (all fields null): meta is built but Optional fields stay empty")
     void emptyIcdcStillPopulatesMeta() {
-        var enriched = IcdcEnricher.enrich(MessageContainer.of("hi"),
+        var enriched = IcdcEnricher.enrich(LinkedMessageContainer.of("hi"),
                 TestIcdcResults.empty(), TestIcdcResults.empty());
 
         var ctx = enriched.messageContextInfo().orElseThrow();
@@ -118,7 +118,7 @@ class IcdcEnricherTest {
         var existing = new ChatMessageContextInfoBuilder()
                 .messageSecret(secret)
                 .build();
-        var container = MessageContainer.of("hi").withMessageContextInfo(existing);
+        var container = LinkedMessageContainer.of("hi").withMessageContextInfo(existing);
 
         var enriched = IcdcEnricher.enrich(container,
                 TestIcdcResults.create(SENDER_KEY_HASH, SENDER_TS, List.of(0), null),
@@ -135,7 +135,7 @@ class IcdcEnricherTest {
     @Test
     @DisplayName("enriched container content() still returns the original payload (side-channel-only change)")
     void contentUnchanged() {
-        var container = MessageContainer.of("preserved");
+        var container = LinkedMessageContainer.of("preserved");
         var enriched = IcdcEnricher.enrich(container,
                 TestIcdcResults.create(SENDER_KEY_HASH, SENDER_TS, List.of(0), null),
                 null);

@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.calls.engine.event;
 
 import com.github.auties00.cobalt.calls.engine.participant.CallParticipantState;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallInteraction;
-import com.github.auties00.cobalt.model.call.CallPeerState;
-import com.github.auties00.cobalt.model.call.CallState;
-import com.github.auties00.cobalt.model.call.IncomingCall;
-import com.github.auties00.cobalt.model.call.JoinableCallLink;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallInteraction;
+import com.github.auties00.cobalt.wire.linked.call.CallPeerState;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
+import com.github.auties00.cobalt.wire.linked.call.JoinableCallLink;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.List;
 import java.util.Objects;

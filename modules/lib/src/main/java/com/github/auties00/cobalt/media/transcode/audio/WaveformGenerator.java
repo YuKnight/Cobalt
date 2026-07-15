@@ -6,7 +6,7 @@ package com.github.auties00.cobalt.media.transcode.audio;
  * <p>The voice-note transcoder pipeline invokes this after decoding the source
  * audio into 16-bit signed PCM at 16 kHz mono and before encoding the Opus OGG
  * payload that ships to the WhatsApp CDN; the resulting bytes go on
- * {@link com.github.auties00.cobalt.model.message.media.AudioMessage#waveform()}.
+ * {@link com.github.auties00.cobalt.wire.linked.message.media.AudioMessage#waveform()}.
  * Each output byte is a value in {@code [0, 100]} representing the percentage of
  * the loudest bucket's RMS amplitude that the corresponding input slice reaches.
  * The WhatsApp clients use these to render the static pre-playback waveform
@@ -59,7 +59,7 @@ final class WaveformGenerator {
      * {@link #DEFAULT_BUCKETS} buckets. The voice-note pipeline calls this after
      * resampling the source audio down to 16 kHz mono and converting to
      * {@code s16le}; the resulting array is what
-     * {@link com.github.auties00.cobalt.model.message.media.AudioMessage#waveform()}
+     * {@link com.github.auties00.cobalt.wire.linked.message.media.AudioMessage#waveform()}
      * exposes on the outgoing protobuf.
      *
      * @param samples the 16-bit signed PCM samples; may be empty

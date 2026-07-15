@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.stun;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.HashMap;
@@ -142,7 +142,7 @@ public enum StunAttributeType {
 
     /**
      * {@code WA_SUBSCRIPTION} (type {@code 0x4024}): a serialized
-     * {@link com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions} protobuf, the WhatsApp
+     * {@link com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptions} protobuf, the WhatsApp
      * Web combined per stream subscription map carried inside the {@code 0x0003} subscription envelope.
      *
      * <p>The value is the raw protobuf bytes, padded to a four byte boundary. Unlike the separate

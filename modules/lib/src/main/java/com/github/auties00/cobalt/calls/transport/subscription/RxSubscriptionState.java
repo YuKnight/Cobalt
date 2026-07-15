@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.subscription;
 
-import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptions;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RxSubscriptions;
 
 import java.util.Objects;
 import java.util.Optional;

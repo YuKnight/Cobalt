@@ -5,8 +5,9 @@ import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
 import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudAuthException;
 import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudApiException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -376,7 +377,7 @@ public final class CloudApiClient {
                 .build();
         var json = send(request, "POST " + appId + "/uploads");
         var sessionId = json.getString("id");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created resumable upload session {0}", Log.token(sessionId));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created resumable upload session {0}", new LogRedactable.Token(sessionId));
         return sessionId;
     }
 
@@ -402,7 +403,7 @@ public final class CloudApiClient {
     public String uploadToSession(String uploadSessionId, long fileOffset, byte[] data) {
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "uploading to resumable session {0}, offset {1}, size {2}",
-                    Log.token(uploadSessionId), fileOffset, data.length);
+                    new LogRedactable.Token(uploadSessionId), fileOffset, data.length);
         }
         var uri = sessionUri(uploadSessionId);
         var request = HttpRequest.newBuilder(uri)
@@ -435,7 +436,7 @@ public final class CloudApiClient {
                 .build();
         var json = send(request, "GET " + uploadSessionId);
         var offset = json.getLongValue("file_offset");
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resumable session {0} offset {1}", Log.token(uploadSessionId), offset);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resumable session {0} offset {1}", new LogRedactable.Token(uploadSessionId), offset);
         return offset;
     }
 

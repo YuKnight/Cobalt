@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.Faker;
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.registration.MobileClientRegistration;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 import org.junit.jupiter.api.Test;

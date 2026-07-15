@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.dtls;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.util.certificate.X509CertificateGenerator;
 import com.github.auties00.cobalt.util.certificate.X509CertificateSpec;
 

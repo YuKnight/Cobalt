@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.util;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.io.IOException;
 import java.io.InputStream;

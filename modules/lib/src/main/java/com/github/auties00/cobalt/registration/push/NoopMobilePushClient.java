@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.registration.push;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
 
 import java.util.Collections;
 import java.util.EnumSet;

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.util.certificate;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.io.ByteArrayInputStream;
 import java.lang.System.Logger.Level;

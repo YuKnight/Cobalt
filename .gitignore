@@ -33,6 +33,7 @@ desktop.ini
 .test/
 .temp/
 re/
+Playground.java
 
 # Validation run data (incremental-mode anchor, reports, captures)
 validation/

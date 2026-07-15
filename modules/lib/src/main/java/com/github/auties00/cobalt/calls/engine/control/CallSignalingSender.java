@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.calls.signaling.CallStanza;
  * <p>An in call control operation builds a typed {@link CallMessage} action and hands it to this seam to be
  * put on the wire. The seam hides where the stanza id assignment, the {@code <call>} envelope wrapping, and
  * the socket write happen: the lifecycle layer that owns a call's dispatcher implements it by wrapping the
- * action through {@link CallStanza#toCall(CallMessage, com.github.auties00.cobalt.model.jid.Jid, String)}
+ * action through {@link CallStanza#toCall(CallMessage, com.github.auties00.cobalt.wire.core.jid.Jid, String)}
  * with a fresh dispatcher id and writing the result to the Linked socket without waiting for a reply. A
  * controller therefore never needs the call's recipient or the dispatcher, only the typed action and this
  * sink.

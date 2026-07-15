@@ -9,14 +9,14 @@ import java.util.Optional;
 
 /**
  * Carries the three expected-timestamp tracking fields stamped onto a
- * {@link com.github.auties00.cobalt.model.device.info.DeviceList}.
+ * {@link com.github.auties00.cobalt.wire.linked.device.info.DeviceList}.
  *
  * <p>This immutable tuple groups the next expected device-list version, the
  * timestamp of the last ADV device-info job that observed it, and the instant
  * at which it was last modified. It is produced by
  * {@link DeviceExpectedTsUtils#computeNewExpectedTimestamp(Instant, Instant, Instant, Instant, Instant, Instant)}
  * and
- * {@link DeviceExpectedTsUtils#computeExpectedTimestampForDeviceRecord(Instant, com.github.auties00.cobalt.model.device.info.DeviceList, Instant)},
+ * {@link DeviceExpectedTsUtils#computeExpectedTimestampForDeviceRecord(Instant, com.github.auties00.cobalt.wire.linked.device.info.DeviceList, Instant)},
  * then consumed when folding a USync response into the local device-list cache.
  * The three fields together let WhatsApp's ADV pipeline detect a device list
  * whose dhash still matches the server's but whose contents are known by the
@@ -97,7 +97,7 @@ public final class ExpectedTimestampResult {
      * the cached expectation.
      *
      * <p>Read by
-     * {@link DeviceExpectedTsUtils#shouldClearExpectedTimestamp(Instant, Instant, com.github.auties00.cobalt.model.device.info.DeviceList, Instant)}
+     * {@link DeviceExpectedTsUtils#shouldClearExpectedTimestamp(Instant, Instant, com.github.auties00.cobalt.wire.linked.device.info.DeviceList, Instant)}
      * to decide whether the cached expectation has already been superseded.
      *
      * @return the last job timestamp, or {@link Optional#empty()} when unset
@@ -114,7 +114,7 @@ public final class ExpectedTimestampResult {
      * modified.
      *
      * <p>Combined with the 25-hour grace window in
-     * {@link DeviceExpectedTsUtils#isDeviceListStale(com.github.auties00.cobalt.model.device.info.DeviceList, Instant, java.time.Duration, Instant)}
+     * {@link DeviceExpectedTsUtils#isDeviceListStale(com.github.auties00.cobalt.wire.linked.device.info.DeviceList, Instant, java.time.Duration, Instant)}
      * to decide when to re-query the device list.
      *
      * @return the update instant, or {@link Optional#empty()} when unset

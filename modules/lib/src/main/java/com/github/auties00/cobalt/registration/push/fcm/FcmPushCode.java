@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;
@@ -97,7 +98,7 @@ final class FcmPushCode {
         synchronized (lock) {
             if (this.code == null) {
                 this.code = code;
-                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm push code delivered: {0}", Log.code(code));
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm push code delivered: {0}", new LogRedactable.Code(code));
                 lock.notifyAll();
             }
         }

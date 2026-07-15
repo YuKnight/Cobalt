@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;
@@ -249,7 +250,7 @@ public final class DtmfDecoder implements AudioDecoder {
         var volume = payload[1] & 0x3F;
         if (endFlag || event >= MAX_TONE_EVENT) {
             if (currentEvent >= 0 && Log.DEBUG) {
-                LOGGER.log(Level.DEBUG, "dtmf tone stopped, event={0}", Log.code(String.valueOf(currentEvent)));
+                LOGGER.log(Level.DEBUG, "dtmf tone stopped, event={0}", new LogRedactable.Code(String.valueOf(currentEvent)));
             }
             currentEvent = -1;
             currentVolume = -1;
@@ -259,7 +260,7 @@ public final class DtmfDecoder implements AudioDecoder {
             initTone(event, volume);
             if (Log.DEBUG) {
                 LOGGER.log(Level.DEBUG, "dtmf tone started, event={0} volume={1}",
-                        Log.code(String.valueOf(event)), volume);
+                        new LogRedactable.Code(String.valueOf(event)), volume);
             }
         }
         return synthesize(frameSamples);

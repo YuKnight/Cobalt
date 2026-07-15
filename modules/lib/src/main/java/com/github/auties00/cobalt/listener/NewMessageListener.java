@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.listener;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.model.message.MessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageInfo;
 
 /**
  * A functional interface for the {@code onNewMessage} event.

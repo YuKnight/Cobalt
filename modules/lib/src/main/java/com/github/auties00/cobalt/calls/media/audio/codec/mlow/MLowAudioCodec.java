@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.EncodedAudioFrame;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusAudioCodec;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusCodecParams;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusDefaultAttr;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 

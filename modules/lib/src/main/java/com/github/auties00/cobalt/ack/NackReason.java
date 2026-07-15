@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.ack;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * Enumerates the integer codes carried on the {@code error} attribute of an {@code <ack>} stanza,

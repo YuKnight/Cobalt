@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 import org.h2.mvstore.type.ByteArrayDataType;

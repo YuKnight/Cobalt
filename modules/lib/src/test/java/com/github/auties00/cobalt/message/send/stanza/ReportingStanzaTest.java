@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ class ReportingStanzaTest {
         var stanza = new ReportingStanza(ab);
         var msg = new ChatMessageInfoBuilder()
                 .key(new MessageKeyBuilder().id("3EB0").parentJid(REMOTE).fromMe(true).build())
-                .message(MessageContainer.of("body"))
+                .message(LinkedMessageContainer.of("body"))
                 .build();
         assertNull(stanza.build(msg, SELF, REMOTE),
                 "missing messageSecret must suppress the <reporting> emission");
@@ -53,7 +53,7 @@ class ReportingStanzaTest {
         var stanza = new ReportingStanza(ab);
         var msg = new ChatMessageInfoBuilder()
                 .key(new MessageKeyBuilder().parentJid(REMOTE).fromMe(true).build())
-                .message(MessageContainer.of("body"))
+                .message(LinkedMessageContainer.of("body"))
                 .messageSecret(SECRET)
                 .build();
         assertNotNull(stanza);

@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.message.send.bot;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.bot.feedback.BotFeedbackMessage;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.system.FutureProofMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.bot.feedback.BotFeedbackMessage;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.FutureProofMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
@@ -20,9 +20,9 @@ import java.util.Objects;
  * Applies the bot-specific protobuf rewrites that precede encryption of a
  * message bound for a bot or FBID-bot recipient.
  *
- * <p>Each method mutates the supplied {@link MessageContainer} in place via
- * setters on the {@link com.github.auties00.cobalt.model.chat.ChatMessageContextInfo}
- * or {@link com.github.auties00.cobalt.model.message.MessageKey} it carries, so
+ * <p>Each method mutates the supplied {@link LinkedMessageContainer} in place via
+ * setters on the {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo}
+ * or {@link com.github.auties00.cobalt.wire.core.message.MessageKey} it carries, so
  * the same container instance must not be shared across recipient fanouts that
  * need different transforms. The transforms run on a per-device copy of the
  * proto right before
@@ -45,7 +45,7 @@ public final class BotProtobufTransform {
      * Constructs a transform bound to the given store.
      *
      * <p>The bound store provides JID resolution; its
-     * {@link LinkedWhatsAppContactStore#findLidByPhone(com.github.auties00.cobalt.model.jid.Jid)}
+     * {@link LinkedWhatsAppContactStore#findLidByPhone(com.github.auties00.cobalt.wire.core.jid.Jid)}
      * upgrades legacy PN participants to LID before the FBID-bot transforms emit
      * the key.
      *
@@ -70,13 +70,13 @@ public final class BotProtobufTransform {
      * through unchanged; the caller is expected to supply the already-derived
      * bot secret rather than re-derive it per fanout.
      *
-     * @param container        the {@link MessageContainer} to mutate
+     * @param container        the {@link LinkedMessageContainer} to mutate
      * @param botMessageSecret the derived bot message secret to install, or
      *                         {@code null} to merely clear the user secret
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateBotInvokeMsgProtoCopyForCapi",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void transformForCapi(MessageContainer container, byte[] botMessageSecret) {
+    public void transformForCapi(LinkedMessageContainer container, byte[] botMessageSecret) {
         container.messageContextInfo().ifPresent(info -> {
             info.setMessageSecret(null);
             info.setBotMessageSecret(botMessageSecret);
@@ -92,14 +92,14 @@ public final class BotProtobufTransform {
      * <p>The server only accepts LID-form participant JIDs on the
      * {@link ContextInfo#quotedMessageSenderJid()} field for messages destined to
      * an FBID (Facebook-account) bot, so any leftover PN is rewritten via
-     * {@link LinkedWhatsAppContactStore#findLidByPhone(com.github.auties00.cobalt.model.jid.Jid)}.
+     * {@link LinkedWhatsAppContactStore#findLidByPhone(com.github.auties00.cobalt.wire.core.jid.Jid)}.
      * Participants already on a bot server are left untouched.
      *
-     * @param container the {@link MessageContainer} to mutate
+     * @param container the {@link LinkedMessageContainer} to mutate
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateFbidBotProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void transformForFbidBot(MessageContainer container) {
+    public void transformForFbidBot(LinkedMessageContainer container) {
         var contextInfo = resolveInnerContextInfo(container);
         if (contextInfo == null) {
             return;
@@ -123,16 +123,16 @@ public final class BotProtobufTransform {
      * Applies the FBID-bot-invoke transform that retargets protocol-message key
      * senders from PN to LID.
      *
-     * <p>Rewrites the {@link com.github.auties00.cobalt.model.message.MessageKey#senderJid()}
+     * <p>Rewrites the {@link com.github.auties00.cobalt.wire.core.message.MessageKey#senderJid()}
      * of the {@link ProtocolMessage#key()} payload to its LID form so the FBID
      * bot can resolve the originating user. Senders already on a bot or LID
      * server are left untouched.
      *
-     * @param container the {@link MessageContainer} to mutate
+     * @param container the {@link LinkedMessageContainer} to mutate
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateFbidBotInvokeProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void transformForFbidBotInvoke(MessageContainer container) {
+    public void transformForFbidBotInvoke(LinkedMessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage pm)) {
             return;
         }
@@ -160,15 +160,15 @@ public final class BotProtobufTransform {
      * protocol-message keys.
      *
      * <p>Clears the {@code parentJid} and the {@code senderJid} on the
-     * {@link com.github.auties00.cobalt.model.message.MessageKey} of the carried
+     * {@link com.github.auties00.cobalt.wire.core.message.MessageKey} of the carried
      * {@link ProtocolMessage} so the bot does not observe the user-side
      * addressing context.
      *
-     * @param container the {@link MessageContainer} to mutate
+     * @param container the {@link LinkedMessageContainer} to mutate
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "updateBotProtobuf",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void transformForBot(MessageContainer container) {
+    public void transformForBot(LinkedMessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage pm)) {
             return;
         }
@@ -183,14 +183,14 @@ public final class BotProtobufTransform {
      * Returns the inner {@link ContextInfo} carried by the container, unwrapping
      * a {@link FutureProofMessage} bot-invoke wrapper transparently.
      *
-     * <p>Lets {@link #transformForFbidBot(MessageContainer)} and
-     * {@link #stripQuotedMessageForNonBot(MessageContainer)} treat both wire
+     * <p>Lets {@link #transformForFbidBot(LinkedMessageContainer)} and
+     * {@link #stripQuotedMessageForNonBot(LinkedMessageContainer)} treat both wire
      * shapes the same.
      *
-     * @param container the {@link MessageContainer} to inspect
+     * @param container the {@link LinkedMessageContainer} to inspect
      * @return the inner {@link ContextInfo}, or {@code null} when none is present
      */
-    private static ContextInfo resolveInnerContextInfo(MessageContainer container) {
+    private static ContextInfo resolveInnerContextInfo(LinkedMessageContainer container) {
         return container.content() instanceof ContextualMessage contextualMessage
                 ? contextualMessage.contextInfo().orElse(null)
                 : null;
@@ -203,9 +203,9 @@ public final class BotProtobufTransform {
      * reply, while stripping user-to-user quote chains so the bot sees only the
      * immediate prompt.
      *
-     * @param container the {@link MessageContainer} to mutate
+     * @param container the {@link LinkedMessageContainer} to mutate
      */
-    private static void stripQuotedMessageForNonBot(MessageContainer container) {
+    private static void stripQuotedMessageForNonBot(LinkedMessageContainer container) {
         var contextInfo = resolveInnerContextInfo(container);
         if (contextInfo == null) {
             return;
@@ -226,9 +226,9 @@ public final class BotProtobufTransform {
      * <p>Clears the parent on both the protocol message's primary key and the
      * optional {@link BotFeedbackMessage#messageKey()}.
      *
-     * @param container the {@link MessageContainer} to mutate
+     * @param container the {@link LinkedMessageContainer} to mutate
      */
-    private static void stripProtocolMessageRemoteJid(MessageContainer container) {
+    private static void stripProtocolMessageRemoteJid(LinkedMessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage pm)) {
             return;
         }

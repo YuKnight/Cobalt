@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.message.send.token;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.reporting.ReportingConfig;
-import com.github.auties00.cobalt.model.reporting.ReportingConfigSpec;
-import com.github.auties00.cobalt.model.reporting.ReportingField;
+import com.github.auties00.cobalt.wire.linked.reporting.ReportingConfig;
+import com.github.auties00.cobalt.wire.linked.reporting.ReportingConfigSpec;
+import com.github.auties00.cobalt.wire.linked.reporting.ReportingField;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>The bytes returned by {@link #compute(byte[], int)} are the second argument
  * to {@link ReportingToken#generate}. The output is a sparse copy of the
- * serialised {@link com.github.auties00.cobalt.model.message.MessageContainer}
+ * serialised {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer}
  * protobuf carrying only the field numbers that the {@link ReportingConfig} for
  * the current sender version whitelists. HMACing the full payload instead of
  * this sparse copy makes the server-side check fail with a
@@ -179,7 +179,7 @@ public final class ReportingTokenContent {
      * recursion level.
      *
      * @param messageBytes  the serialised
-     *                      {@link com.github.auties00.cobalt.model.message.MessageContainer}
+     *                      {@link com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer}
      *                      protobuf
      * @param senderVersion the {@code rt_sender_reporting_token_version}
      *                      currently in effect

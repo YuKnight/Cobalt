@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.chat.*;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.media.MediaVisibility;
-import com.github.auties00.cobalt.model.message.PrivacySystemMessage;
-import com.github.auties00.cobalt.model.setting.WallpaperSettings;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.chat.*;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupParticipant;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.media.MediaVisibility;
+import com.github.auties00.cobalt.wire.linked.message.PrivacySystemMessage;
+import com.github.auties00.cobalt.wire.linked.setting.WallpaperSettings;
 import it.auties.protobuf.annotation.ProtobufMessage;
 
 import java.lang.System.Logger.Level;

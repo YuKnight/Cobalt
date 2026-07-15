@@ -9,9 +9,9 @@ import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.event.CallLifecycleEventSink;
 import com.github.auties00.cobalt.calls.engine.mediaplane.MediaStreams;
 import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;
@@ -237,8 +237,8 @@ public final class LiveCallTimerScheduler implements CallTimerScheduler {
      * cutoff; it then rearms itself for the next second, matching the engine's self rescheduling
      * watchdog. The two one to one call setup deadlines the engine watchdog also enforces are enforced
      * on the host path elsewhere: the offer ack deadline by the synchronous offer ack wait in
-     * {@link LifecycleController#startCall(com.github.auties00.cobalt.model.jid.Jid,
-     * com.github.auties00.cobalt.model.jid.Jid, java.util.List, boolean, MediaStreams)}, and the no
+     * {@link LifecycleController#startCall(com.github.auties00.cobalt.wire.core.jid.Jid,
+     * com.github.auties00.cobalt.wire.core.jid.Jid, java.util.List, boolean, MediaStreams)}, and the no
      * answer deadline by the {@link CallTimerKind#CALLER_LONELY} timer, so the watchdog adds no
      * further one to one teardown here.
      *

@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.calls.telemetry;
 
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.CallState;
-import com.github.auties00.cobalt.wam.type.CallSide;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
+import com.github.auties00.cobalt.wire.wam.type.CallSide;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;

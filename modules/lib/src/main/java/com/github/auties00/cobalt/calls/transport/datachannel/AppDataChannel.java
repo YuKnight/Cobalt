@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.datachannel.AppDataMessage;
-import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloads;
-import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloadsBuilder;
-import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloadsSpec;
-import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
-import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayloadSpec;
-import com.github.auties00.cobalt.model.call.datachannel.PeerFeedback;
-import com.github.auties00.cobalt.model.call.datachannel.PeerFeedbackSpec;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.AppDataMessage;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.AppDataPayloads;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.AppDataPayloadsBuilder;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.AppDataPayloadsSpec;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.E2eRekeyPayload;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.E2eRekeyPayloadSpec;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.PeerFeedback;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.PeerFeedbackSpec;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;

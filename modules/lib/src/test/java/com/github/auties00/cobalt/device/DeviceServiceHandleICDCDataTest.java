@@ -5,10 +5,10 @@ import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.device.DeviceListMetadataBuilder;
-import com.github.auties00.cobalt.model.device.info.DeviceInfo;
-import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.device.DeviceListMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceInfo;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceListBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * with timestamp but no key-hash takes the minimal-sync path that bumps the cached timestamp by one
  * second.
  *
- * <p>Each test constructs the {@link com.github.auties00.cobalt.model.device.DeviceListMetadata}
+ * <p>Each test constructs the {@link com.github.auties00.cobalt.wire.linked.device.DeviceListMetadata}
  * directly rather than capturing an inbound message stanza, since capturing such a message is
  * operator-dependent and the metadata payload is identical to what the Cobalt message receiver
  * pipeline produces after decryption.

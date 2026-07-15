@@ -5,10 +5,10 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
 import com.github.auties00.cobalt.sync.ConflictResolution;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ import java.util.Map;
  * <p>Each implementation adapts one WhatsApp Web sync module which describes how mutations of a
  * single action type are validated, applied to the local store, conflict-resolved against pending
  * outgoing mutations, and (for the message-oriented actions) re-keyed into the
- * {@link com.github.auties00.cobalt.model.message.MessageKey} space. The dispatcher selects the
+ * {@link com.github.auties00.cobalt.wire.core.message.MessageKey} space. The dispatcher selects the
  * right handler via {@link #actionName()} and reads {@link #collectionName()} / {@link #version()}
  * as routing metadata for patch decoding and version gating. The framework selects the right
  * implementation when an incoming sync patch reaches the dispatch loop; this surface is documented

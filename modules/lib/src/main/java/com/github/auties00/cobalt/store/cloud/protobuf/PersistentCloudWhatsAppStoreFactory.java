@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.store.cloud.protobuf;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
@@ -110,12 +111,12 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
         var sessionDirectory = sessionDirectory(phoneNumberId);
         var storeFile = sessionDirectory.resolve(STORE_FILE);
         if (Files.notExists(storeFile)) {
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no cloud store snapshot found for {0}", Log.phone(phoneNumberId));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no cloud store snapshot found for {0}", new LogRedactable.Phone(phoneNumberId));
             return Optional.empty();
         }
         var store = deserialize(storeFile);
         writeLatestSession(phoneNumberId);
-        if (Log.INFO) LOGGER.log(Level.INFO, "loaded cloud store for {0}", Log.phone(phoneNumberId));
+        if (Log.INFO) LOGGER.log(Level.INFO, "loaded cloud store for {0}", new LogRedactable.Phone(phoneNumberId));
         return Optional.of(store);
     }
 
@@ -157,7 +158,7 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
                 .build();
         store.save();
         writeLatestSession(phoneNumberId);
-        if (Log.INFO) LOGGER.log(Level.INFO, "created cloud store for {0}", Log.phone(phoneNumberId));
+        if (Log.INFO) LOGGER.log(Level.INFO, "created cloud store for {0}", new LogRedactable.Phone(phoneNumberId));
         return store;
     }
 

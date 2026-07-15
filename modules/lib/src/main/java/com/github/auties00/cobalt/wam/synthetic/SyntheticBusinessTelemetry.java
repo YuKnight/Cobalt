@@ -2,10 +2,10 @@ package com.github.auties00.cobalt.wam.synthetic;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.*;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.event.*;
+import com.github.auties00.cobalt.wire.wam.type.*;
 
 import java.util.Objects;
 import java.util.UUID;

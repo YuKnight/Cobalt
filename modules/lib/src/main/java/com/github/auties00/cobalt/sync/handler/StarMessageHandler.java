@@ -2,18 +2,18 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.contact.StarAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.StarAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.lang.System.Logger.Level;
@@ -84,7 +84,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
      * the message itself is otherwise looked up directly by chat JID and message
      * id, returning {@link MutationApplicationResult#orphan(String, String)} when
      * absent. The starred flag is then propagated through
-     * {@link #starMessage(MessageInfo, boolean)}.
+     * {@link #starMessage(LinkedMessageInfo, boolean)}.
      *
      * @implNote
      * WA Web's two-tier message resolution (a
@@ -161,7 +161,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
     }
 
     /**
-     * Sets the starred flag on a {@link MessageInfo} regardless of its concrete
+     * Sets the starred flag on a {@link LinkedMessageInfo} regardless of its concrete
      * subtype.
      *
      * <p>Dispatches the resolved {@code starred} flag onto either a chat message
@@ -179,7 +179,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
      * @param starred {@code true} to star, {@code false} to unstar
      */
     @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    private static void starMessage(MessageInfo message, boolean starred) {
+    private static void starMessage(LinkedMessageInfo message, boolean starred) {
         switch (message) {
             case ChatMessageInfo chatMessageInfo -> chatMessageInfo.setStarred(starred);
             case NewsletterMessageInfo newsletterMessageInfo -> newsletterMessageInfo.setStarred(starred);

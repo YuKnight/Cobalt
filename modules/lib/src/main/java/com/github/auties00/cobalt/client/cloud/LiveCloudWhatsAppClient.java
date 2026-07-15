@@ -12,28 +12,29 @@ import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudUnsupportedVersio
 import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudApiException;
 import com.github.auties00.cobalt.listener.*;
 import com.github.auties00.cobalt.listener.cloud.*;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
-import com.github.auties00.cobalt.model.business.profile.BusinessProfileBuilder;
-import com.github.auties00.cobalt.model.cloud.*;
-import com.github.auties00.cobalt.model.cloud.analytics.*;
-import com.github.auties00.cobalt.model.cloud.commerce.*;
-import com.github.auties00.cobalt.model.cloud.flow.*;
-import com.github.auties00.cobalt.model.cloud.phone.*;
-import com.github.auties00.cobalt.model.cloud.signup.CloudAppCredentials;
-import com.github.auties00.cobalt.model.cloud.signup.CloudOAuthToken;
-import com.github.auties00.cobalt.model.cloud.signup.CloudSignupCodeExchange;
-import com.github.auties00.cobalt.model.cloud.signup.CloudTokenInspection;
-import com.github.auties00.cobalt.model.cloud.template.*;
-import com.github.auties00.cobalt.model.cloud.template.library.CloudTemplateLibraryAdoption;
-import com.github.auties00.cobalt.model.cloud.waba.*;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.business.profile.BusinessProfile;
+import com.github.auties00.cobalt.wire.linked.business.profile.BusinessProfileBuilder;
+import com.github.auties00.cobalt.wire.cloud.*;
+import com.github.auties00.cobalt.wire.cloud.analytics.*;
+import com.github.auties00.cobalt.wire.cloud.commerce.*;
+import com.github.auties00.cobalt.wire.cloud.flow.*;
+import com.github.auties00.cobalt.wire.cloud.phone.*;
+import com.github.auties00.cobalt.wire.cloud.signup.CloudAppCredentials;
+import com.github.auties00.cobalt.wire.cloud.signup.CloudOAuthToken;
+import com.github.auties00.cobalt.wire.cloud.signup.CloudSignupCodeExchange;
+import com.github.auties00.cobalt.wire.cloud.signup.CloudTokenInspection;
+import com.github.auties00.cobalt.wire.cloud.template.*;
+import com.github.auties00.cobalt.wire.cloud.template.library.CloudTemplateLibraryAdoption;
+import com.github.auties00.cobalt.wire.cloud.waba.*;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 
 import java.io.IOException;
@@ -311,7 +312,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      * {@inheritDoc}
      */
     @Override
-    public MessageKey sendMessage(JidProvider recipient, MessageContainer message) {
+    public MessageKey sendMessage(JidProvider recipient, LinkedMessageContainer message) {
         var body = CloudMessageEncoder.encode(recipient, message);
         var response = api.post(store.phoneNumberId() + "/messages", body);
         var key = new MessageKeyBuilder()
@@ -327,7 +328,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      * {@inheritDoc}
      */
     @Override
-    public void sendMessage(MessageInfo messageInfo) {
+    public void sendMessage(LinkedMessageInfo messageInfo) {
         var recipient = messageInfo.key().parentJid()
                 .orElseThrow(() -> new IllegalArgumentException("messageInfo key must carry a parentJid"));
         sendMessage(recipient, messageInfo.message());
@@ -979,7 +980,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void verifyCode(String code) {
         api.postForm(store.phoneNumberId() + "/verify_code", Map.of("code", code));
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verified code {0}", Log.code(code));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verified code {0}", new LogRedactable.Code(code));
     }
 
     /**
@@ -1082,7 +1083,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         var response = api.post(requireWaba() + "/phone_numbers", body);
         var phoneNumberId = response.getString("id");
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "added phone number {0}, id {1}",
-                Log.phone(add.phoneNumber()), phoneNumberId);
+                new LogRedactable.Phone(add.phoneNumber()), phoneNumberId);
         return phoneNumberId;
     }
 
@@ -2589,7 +2590,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     private void dispatchCalls(JSONObject value) {
         for (var event : CloudWebhookDecoder.decodeCalls(value)) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received call signaling {0} from {1}",
-                    event.callId(), Log.phone(event.from()));
+                    event.callId(), new LogRedactable.Phone(event.from()));
             forEach(CloudCallListener.class, listener -> listener.onCall(this, event));
         }
         for (var event : CloudWebhookDecoder.decodeCallStatuses(value)) {
@@ -2729,7 +2730,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 "code", exchange.code()));
         var token = parseOAuthToken(response);
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exchanged signup code for access token {0}",
-                Log.token(token.accessToken()));
+                new LogRedactable.Token(token.accessToken()));
         return token;
     }
 
@@ -2747,7 +2748,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 "fb_exchange_token", shortLivedToken));
         var token = parseOAuthToken(response);
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exchanged short-lived token for access token {0}",
-                Log.token(token.accessToken()));
+                new LogRedactable.Token(token.accessToken()));
         return token;
     }
 
@@ -2785,7 +2786,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 expiresAt,
                 scopes,
                 data.getString("user_id"));
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "inspected token {0}, valid {1}", Log.token(token), inspection.valid());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "inspected token {0}, valid {1}", new LogRedactable.Token(token), inspection.valid());
         return inspection;
     }
 

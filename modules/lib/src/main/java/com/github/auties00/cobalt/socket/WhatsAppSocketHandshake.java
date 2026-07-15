@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.pairing.HandshakeMessage;
-import com.github.auties00.cobalt.model.device.pairing.HandshakeMessageSpec;
+import com.github.auties00.cobalt.wire.linked.device.pairing.HandshakeMessage;
+import com.github.auties00.cobalt.wire.linked.device.pairing.HandshakeMessageSpec;
 import com.github.auties00.cobalt.socket.datagram.WhatsAppDatagramInputStream;
 import com.github.auties00.cobalt.socket.datagram.WhatsAppDatagramOutputStream;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 

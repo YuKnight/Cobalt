@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.calls.config;
 
 import com.github.auties00.cobalt.calls.config.param.VoipParamJsonDeserializer;
 import com.github.auties00.cobalt.calls.config.param.VoipParams;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.System.Logger.Level;
 import java.util.Optional;

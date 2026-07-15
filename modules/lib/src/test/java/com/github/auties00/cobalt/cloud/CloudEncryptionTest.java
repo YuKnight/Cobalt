@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.cloud;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
-import com.github.auties00.cobalt.model.cloud.waba.CloudBusinessEncryption;
-import com.github.auties00.cobalt.model.cloud.waba.CloudBusinessEncryptionSignatureStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.waba.CloudBusinessEncryption;
+import com.github.auties00.cobalt.wire.cloud.waba.CloudBusinessEncryptionSignatureStatus;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

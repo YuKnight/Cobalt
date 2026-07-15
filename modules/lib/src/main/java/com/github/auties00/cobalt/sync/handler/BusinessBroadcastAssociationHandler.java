@@ -2,17 +2,17 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.BroadcastListParticipant;
-import com.github.auties00.cobalt.model.business.BroadcastListParticipantBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastAssociationAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.business.BroadcastListParticipant;
+import com.github.auties00.cobalt.wire.linked.business.BroadcastListParticipantBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastAssociationAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -102,7 +102,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      * mutable {@link ArrayList} before mutating because the model
      * exposes an unmodifiable {@link List}; the parent list is then
      * upserted via
-     * {@link LinkedWhatsAppBusinessStore#putBusinessBroadcastList(com.github.auties00.cobalt.model.business.BusinessBroadcastList)}.
+     * {@link LinkedWhatsAppBusinessStore#putBusinessBroadcastList(com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList)}.
      * Phone-number recipients resolve their LID via
      * {@link LinkedWhatsAppContactStore#findLidByPhone(Jid)},
      * falling back to the phone-number JID itself when no LID is known. An empty

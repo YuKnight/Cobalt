@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.store.persistent;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 import org.junit.jupiter.api.DisplayName;
@@ -48,7 +48,7 @@ class PersistentMessageStoreTest {
         return new ChatMessageInfoBuilder()
                 .key(key)
                 .senderJid(SELF)
-                .message(MessageContainer.of(body))
+                .message(LinkedMessageContainer.of(body))
                 .build();
     }
 

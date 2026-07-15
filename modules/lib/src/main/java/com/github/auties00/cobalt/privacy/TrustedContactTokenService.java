@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.privacy;
 
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 
 import java.time.Instant;
 import java.util.Base64;

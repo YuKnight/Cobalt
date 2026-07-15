@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.migration.PhoneNumberToLIDMappingBuilder;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
-import com.github.auties00.cobalt.model.setting.GlobalSettingsBuilder;
-import com.github.auties00.cobalt.model.sync.history.HistorySyncLightBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.jid.migration.PhoneNumberToLIDMappingBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncType;
+import com.github.auties00.cobalt.wire.linked.setting.GlobalSettingsBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.history.HistorySyncLightBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers {@link LidMigrationService#processHistorySync}: the metadata-only ingestion path through
- * the {@link com.github.auties00.cobalt.model.sync.history.HistorySync.Light} variant (built via
+ * the {@link com.github.auties00.cobalt.wire.linked.sync.history.HistorySync.Light} variant (built via
  * {@link HistorySyncLightBuilder}), pinning top-level mapping ingestion into the store and the
  * {@code GlobalSettings.chatDbLidMigrationTimestamp} absorption. The conversation-level branch is
  * exercised through the package-private {@link LidMigrationService#processConversationLidData} test

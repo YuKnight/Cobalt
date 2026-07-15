@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.wam;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;

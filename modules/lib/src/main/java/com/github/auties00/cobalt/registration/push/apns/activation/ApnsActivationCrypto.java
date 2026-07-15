@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.activation;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import javax.security.auth.x500.X500Principal;
 import java.io.ByteArrayOutputStream;

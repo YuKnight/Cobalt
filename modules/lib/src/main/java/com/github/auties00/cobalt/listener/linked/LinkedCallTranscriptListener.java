@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.listener.linked;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 /**
  * A functional interface for the {@link LinkedWhatsAppClientListener#onCallTranscript onCallTranscript} event.

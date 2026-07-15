@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.key;
 
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 
 import java.util.Collection;

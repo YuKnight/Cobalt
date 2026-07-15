@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +38,7 @@ class MetaStanzaTest {
                 Jid.of("258252122116273@lid"));
         var stanza = new MetaStanza(store);
         var node = stanza.buildChat(Jid.statusBroadcastAccount(),
-                MessageContainer.of("status body"), "contacts", null);
+                LinkedMessageContainer.of("status body"), "contacts", null);
         assertNotNull(node, "status messages with status_setting must emit <meta>");
         assertEquals("meta", node.description());
         assertEquals("contacts", node.getAttributeAsString("status_setting").orElseThrow(),
@@ -54,7 +54,7 @@ class MetaStanzaTest {
         var hashedThreadId = "abcdef0123456789";
         var node = stanza.buildChat(
                 Jid.of("12025550200@s.whatsapp.net"),
-                MessageContainer.of("hi"),
+                LinkedMessageContainer.of("hi"),
                 null, hashedThreadId);
         assertNotNull(node, "messages in an AI thread must emit <meta conversation_thread_id=...>");
         assertEquals(hashedThreadId, node.getAttributeAsString("conversation_thread_id").orElseThrow());

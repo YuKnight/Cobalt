@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.message.receive;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import java.lang.System.Logger.Level;
@@ -26,15 +26,15 @@ import java.util.Objects;
  *
  * @implSpec
  * A subclass must convert a raw inbound {@code <message>} stanza into the appropriate
- * {@link MessageInfo} subtype via {@link #receive(Stanza, Jid)}; returning {@code null}
+ * {@link LinkedMessageInfo} subtype via {@link #receive(Stanza, Jid)}; returning {@code null}
  * is reserved for stanzas that the receiver intentionally drops without raising an
  * error (for example unavailable fanout placeholders or newsletter messages with no
  * payload).
  *
- * @param <T> the concrete {@link MessageInfo} subtype produced by the receiver
+ * @param <T> the concrete {@link LinkedMessageInfo} subtype produced by the receiver
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsg")
-abstract sealed class MessageReceiver<T extends MessageInfo>
+abstract sealed class MessageReceiver<T extends LinkedMessageInfo>
         permits ChatMessageReceiver, NewsletterMessageReceiver {
 
     /**
@@ -63,7 +63,7 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
 
     /**
      * Processes an incoming {@code <message>} stanza into the receiver's concrete
-     * {@link MessageInfo} subtype.
+     * {@link LinkedMessageInfo} subtype.
      *
      * <p>Invoked by {@link MessageReceivingService#process(Stanza)} after the router has
      * selected the receiver from the {@code from} JID. A {@code null} return means the
@@ -106,7 +106,7 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
     }
 
     /**
-     * Decodes the raw protobuf plaintext into a {@link MessageContainer}, returning
+     * Decodes the raw protobuf plaintext into a {@link LinkedMessageContainer}, returning
      * {@code null} on parse failure rather than throwing.
      *
      * <p>Both receivers call this after obtaining the plaintext (after decryption on
@@ -127,9 +127,9 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgProcess", exports = "processDecryptedMessageProto",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    MessageContainer decodeProtobuf(String messageId, byte[] plaintext) {
+    LinkedMessageContainer decodeProtobuf(String messageId, byte[] plaintext) {
         try {
-            return MessageContainerSpec.decode(plaintext);
+            return LinkedMessageContainerSpec.decode(plaintext);
         } catch (Exception e) {
             if (Log.WARNING) LOGGER.log(Level.WARNING,
                     "failed to decode protobuf for message " + messageId, e);

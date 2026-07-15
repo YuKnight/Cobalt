@@ -1,15 +1,16 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
 
 import java.lang.System.Logger.Level;
 import java.net.http.HttpClient;
@@ -92,11 +93,11 @@ public final class GroupInvitePreviewResolver {
         try {
             metadata = client.queryInviteGroupInfo(code).orElse(null);
         } catch (RuntimeException e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "group invite metadata query failed for code " + Log.token(code), e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "group invite metadata query failed for code " + new LogRedactable.Token(code), e);
             return false;
         }
         if (metadata == null) {
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "group invite preview skipped, no metadata for code {0}", Log.token(code));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "group invite preview skipped, no metadata for code {0}", new LogRedactable.Token(code));
             return false;
         }
         message.setTitle(metadata.subject());
@@ -143,7 +144,7 @@ public final class GroupInvitePreviewResolver {
             }
             return PreviewThumbnailFetcher.download(httpClient, pictureUri, timeout);
         } catch (RuntimeException e) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "group picture download failed for " + Log.jid(String.valueOf(groupJid)), e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "group picture download failed for " + new LogRedactable.User(String.valueOf(groupJid)), e);
             return null;
         }
     }

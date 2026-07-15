@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.transport.subscription;
 
-import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptions;
-import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptions;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RxSubscriptions;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SenderSubscriptions;
 
 import java.util.Arrays;
 import java.util.Objects;

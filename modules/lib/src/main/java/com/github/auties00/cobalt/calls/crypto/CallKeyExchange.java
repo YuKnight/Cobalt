@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.crypto;
 
 import com.github.auties00.cobalt.calls.signaling.session.CallKeyDistribution;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.Collection;
 import java.util.List;

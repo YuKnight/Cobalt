@@ -2,38 +2,38 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButton;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonCopyCodeBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonFlowBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonOtpBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonPhoneNumberBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonQuickReplyBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonUrlBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponent;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentBodyBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentFooterBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentHeaderBuilder;
-import com.github.auties00.cobalt.model.cloud.template.CloudOtpType;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateHeaderFormat;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.commerce.ButtonsMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.interactive.TemplateButton;
-import com.github.auties00.cobalt.model.message.interactive.TemplateMessage;
-import com.github.auties00.cobalt.model.message.list.ListMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.AudioMessage;
-import com.github.auties00.cobalt.model.message.media.DocumentMessage;
-import com.github.auties00.cobalt.model.message.media.ImageMessage;
-import com.github.auties00.cobalt.model.message.media.StickerMessage;
-import com.github.auties00.cobalt.model.message.media.VideoMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButton;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButtonCopyCodeBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButtonFlowBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButtonOtpBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButtonPhoneNumberBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButtonQuickReplyBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateButtonUrlBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponent;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponentBodyBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponentFooterBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponentHeaderBuilder;
+import com.github.auties00.cobalt.wire.cloud.template.CloudOtpType;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateHeaderFormat;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.commerce.ButtonsMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.TemplateButton;
+import com.github.auties00.cobalt.wire.linked.message.interactive.TemplateMessage;
+import com.github.auties00.cobalt.wire.linked.message.list.ListMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.AudioMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.DocumentMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.StickerMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.VideoMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.HighlyStructuredMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -41,10 +41,10 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Translates Cobalt's universal {@link MessageContainer} model into the Cloud API {@code /messages}
+ * Translates Cobalt's universal {@link LinkedMessageContainer} model into the Cloud API {@code /messages}
  * request body.
  *
- * <p>The encoder switches over the active message variant returned by {@link MessageContainer#content()}
+ * <p>The encoder switches over the active message variant returned by {@link LinkedMessageContainer#content()}
  * and produces the matching Cloud JSON shape: text, media (image, video, audio, document, sticker),
  * location, contacts, reaction, interactive (reply buttons, lists, native-flow call-to-action and flow,
  * location and address requests), and template messages. Media is
@@ -76,7 +76,7 @@ public final class CloudMessageEncoder {
      * @return the JSON request body ready to post to the messages edge
      * @throws IllegalArgumentException if the message variant has no Cloud API representation
      */
-    public static JSONObject encode(JidProvider recipient, MessageContainer container) {
+    public static JSONObject encode(JidProvider recipient, LinkedMessageContainer container) {
         var root = new JSONObject();
         root.put("messaging_product", "whatsapp");
         root.put("recipient_type", "individual");
@@ -92,7 +92,7 @@ public final class CloudMessageEncoder {
      * @param container the message content
      * @throws IllegalArgumentException if the message variant has no Cloud API representation
      */
-    private static void encodeContent(JSONObject root, MessageContainer container) {
+    private static void encodeContent(JSONObject root, LinkedMessageContainer container) {
         switch (container.content()) {
             case ExtendedTextMessage text -> {
                 root.put("type", "text");

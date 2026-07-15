@@ -2,11 +2,11 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.cloud.CloudCallDirection;
-import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
-import com.github.auties00.cobalt.model.cloud.CloudCallPermissionResponse;
-import com.github.auties00.cobalt.model.cloud.CloudCallSession;
-import com.github.auties00.cobalt.model.cloud.CloudCallStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudCallDirection;
+import com.github.auties00.cobalt.wire.cloud.CloudCallEvent;
+import com.github.auties00.cobalt.wire.cloud.CloudCallPermissionResponse;
+import com.github.auties00.cobalt.wire.cloud.CloudCallSession;
+import com.github.auties00.cobalt.wire.cloud.CloudCallStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

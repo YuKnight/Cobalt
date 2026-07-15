@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.calls.engine.participant;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;

@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.listener.cloud;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
+import com.github.auties00.cobalt.wire.cloud.CloudCallEvent;
 
 /**
  * A functional interface for the {@link CloudWhatsAppClientListener#onCall onCall} event.

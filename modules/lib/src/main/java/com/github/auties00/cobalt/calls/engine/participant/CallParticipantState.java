@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.model.call.CallPeerState;
+import com.github.auties00.cobalt.wire.linked.call.CallPeerState;
 
 import java.util.HashMap;
 import java.util.Map;

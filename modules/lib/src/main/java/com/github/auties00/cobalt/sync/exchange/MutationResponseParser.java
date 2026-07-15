@@ -1,16 +1,16 @@
 package com.github.auties00.cobalt.sync.exchange;
 
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.media.ExternalBlobReference;
-import com.github.auties00.cobalt.model.media.ExternalBlobReferenceSpec;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.SyncdPatch;
-import com.github.auties00.cobalt.model.sync.data.SyncdPatchSpec;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReference;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReferenceSpec;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdPatch;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdPatchSpec;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;

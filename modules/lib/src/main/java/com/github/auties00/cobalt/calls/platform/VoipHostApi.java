@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.calls.platform;
 
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.foreign.MemorySegment;
 import java.net.InetAddress;

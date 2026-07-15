@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.calls.signaling.session;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -36,7 +36,7 @@ import com.github.auties00.cobalt.calls.signaling.SignalingType;
  *
  * @implNote This implementation reuses the regular message fanout Signal envelope shape
  * ({@code v="2"}, {@code type="msg|pkmsg"}, {@code count="0"}); the ciphertext is the encrypted
- * {@code MessageContainer} carrying the call key and is produced by the message encryption pipeline,
+ * {@code LinkedMessageContainer} carrying the call key and is produced by the message encryption pipeline,
  * not by this record.
  *
  * @param deviceJid  the device this key slot addresses; never {@code null}

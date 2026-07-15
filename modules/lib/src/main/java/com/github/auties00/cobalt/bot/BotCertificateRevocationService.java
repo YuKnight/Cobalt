@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.bot;
 
-import com.github.auties00.cobalt.stanza.mex.json.bot.FetchBotCertificateRevocationListMexRequest;
+import com.github.auties00.cobalt.wire.stanza.mex.json.bot.FetchBotCertificateRevocationListMexRequest;
 
 import java.math.BigInteger;
 

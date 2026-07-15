@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket.websocket;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;

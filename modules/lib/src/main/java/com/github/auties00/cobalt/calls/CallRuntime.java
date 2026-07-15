@@ -5,10 +5,10 @@ import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.calls.telemetry.CallStats;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallState;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

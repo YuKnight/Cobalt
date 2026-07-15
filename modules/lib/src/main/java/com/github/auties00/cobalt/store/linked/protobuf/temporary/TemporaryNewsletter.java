@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.store.linked.protobuf.temporary;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
 
 import java.util.Objects;

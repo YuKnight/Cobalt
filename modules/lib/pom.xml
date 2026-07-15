@@ -338,11 +338,6 @@
                         </annotationProcessorPath>
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
-                            <artifactId>cobalt-wam-core</artifactId>
-                            <version>${project.version}</version>
-                        </annotationProcessorPath>
-                        <annotationProcessorPath>
-                            <groupId>com.github.auties00</groupId>
                             <artifactId>cobalt-source-meta</artifactId>
                             <version>${project.version}</version>
                         </annotationProcessorPath>
@@ -395,7 +390,42 @@
         <!-- WhatsApp protobuf data model -->
         <dependency>
             <groupId>com.github.auties00</groupId>
-            <artifactId>cobalt-model</artifactId>
+            <artifactId>cobalt-wire-linked</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-stanza-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-telemetry-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-wire-cloud</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-wire-wam</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-wire-stanza</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-wire-graphql</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>cobalt-wire-push</artifactId>
             <version>${project.version}</version>
         </dependency>
 

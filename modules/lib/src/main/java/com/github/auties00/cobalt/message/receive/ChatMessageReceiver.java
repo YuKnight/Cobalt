@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.message.receive;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException.Receive.InvalidDeviceSentMessage.DsmErrorType;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.addon.EncMessageFactory;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
@@ -17,60 +17,60 @@ import com.github.auties00.cobalt.message.send.token.ReportingTokenContent;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
-import com.github.auties00.cobalt.model.chat.ChatMute;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.FutureProofMessageType;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.message.MessageThreadId;
-import com.github.auties00.cobalt.model.message.commerce.ButtonsMessage;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
-import com.github.auties00.cobalt.model.message.commerce.ProductMessage;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessage;
-import com.github.auties00.cobalt.model.message.interactive.TemplateMessage;
-import com.github.auties00.cobalt.model.message.list.ListMessage;
-import com.github.auties00.cobalt.model.message.newsletter.NewsletterFollowerInviteMessage;
-import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMute;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.message.MessageThreadId;
+import com.github.auties00.cobalt.wire.linked.message.commerce.ButtonsMessage;
+import com.github.auties00.cobalt.wire.linked.message.commerce.OrderMessage;
+import com.github.auties00.cobalt.wire.linked.message.commerce.ProductMessage;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.TemplateMessage;
+import com.github.auties00.cobalt.wire.linked.message.list.ListMessage;
+import com.github.auties00.cobalt.wire.linked.message.newsletter.NewsletterFollowerInviteMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.DeviceSentMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.HighlyStructuredMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.BroadcastInvalidChannelsContextSourceMessageDropEventBuilder;
-import com.github.auties00.cobalt.wam.event.CtwaBizUserJourneyEventBuilder;
-import com.github.auties00.cobalt.wam.event.MessageSecretErrorsEventBuilder;
-import com.github.auties00.cobalt.wam.event.PsStructuredMessageInteractionEventBuilder;
-import com.github.auties00.cobalt.wam.event.QbmIncomingMessageEventBuilder;
-import com.github.auties00.cobalt.wam.event.ReportingTokenValidationFailureEventBuilder;
-import com.github.auties00.cobalt.wam.event.ReportingTokenValidationFailureSenderEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcStatusSyncEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.BroadcastInvalidChannelsContextSourceMessageDropEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.CtwaBizUserJourneyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MessageSecretErrorsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PsStructuredMessageInteractionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.QbmIncomingMessageEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ReportingTokenValidationFailureEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ReportingTokenValidationFailureSenderEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcStatusSyncEventBuilder;
 import com.github.auties00.cobalt.wam.model.WamEventSpec;
-import com.github.auties00.cobalt.wam.type.BizPlatform;
-import com.github.auties00.cobalt.wam.type.ChatsFolderType;
-import com.github.auties00.cobalt.wam.type.ContactType;
-import com.github.auties00.cobalt.wam.type.CtwaBizUserJourneyOperation;
-import com.github.auties00.cobalt.wam.type.DeviceType;
-import com.github.auties00.cobalt.wam.type.EditType;
-import com.github.auties00.cobalt.wam.type.InteractionType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageSecretAllowedType;
-import com.github.auties00.cobalt.wam.type.MessageSecretErrorType;
-import com.github.auties00.cobalt.wam.type.QbmFlag;
-import com.github.auties00.cobalt.wam.type.ReportingTokenValidationFailureReason;
-import com.github.auties00.cobalt.wam.type.StructuredMessageClass;
+import com.github.auties00.cobalt.wire.wam.type.BizPlatform;
+import com.github.auties00.cobalt.wire.wam.type.ChatsFolderType;
+import com.github.auties00.cobalt.wire.wam.type.ContactType;
+import com.github.auties00.cobalt.wire.wam.type.CtwaBizUserJourneyOperation;
+import com.github.auties00.cobalt.wire.wam.type.DeviceType;
+import com.github.auties00.cobalt.wire.wam.type.EditType;
+import com.github.auties00.cobalt.wire.wam.type.InteractionType;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MessageSecretAllowedType;
+import com.github.auties00.cobalt.wire.wam.type.MessageSecretErrorType;
+import com.github.auties00.cobalt.wire.wam.type.QbmFlag;
+import com.github.auties00.cobalt.wire.wam.type.ReportingTokenValidationFailureReason;
+import com.github.auties00.cobalt.wire.wam.type.StructuredMessageClass;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
@@ -309,7 +309,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebPollsVoteDecryption", exports = "decryptVote",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void maybeDecryptPollVote(MessageContainer container, MessageReceiveStanza stanza) {
+    private void maybeDecryptPollVote(LinkedMessageContainer container, MessageReceiveStanza stanza) {
         if (!(container.content() instanceof PollUpdateMessage poll) || poll.vote().isEmpty()) {
             return;
         }
@@ -738,7 +738,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * @implNote
      * This implementation skips WhatsApp Web's {@code WAWebMsmsgMsgSecretCache} layer
      * and reads the target message straight from the store via
-     * {@link LinkedWhatsAppChatStore#findMessageById(com.github.auties00.cobalt.model.jid.JidProvider, String)},
+     * {@link LinkedWhatsAppChatStore#findMessageById(com.github.auties00.cobalt.wire.core.jid.JidProvider, String)},
      * keyed by {@code (targetChatJid, targetId)}. The result is accepted only when the
      * resolved {@link ChatMessageInfo#messageSecret()} is non-empty; an absent secret
      * raises {@link WhatsAppMessageException.Receive.InvalidMessage} rather than WA
@@ -810,7 +810,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             adaptation = WhatsAppAdaptation.DIRECT)
     private void validateHsmConsistency(
             MessageReceiveStanza stanza,
-            MessageContainer container
+            LinkedMessageContainer container
     ) {
         if (!stanza.isHsm() && container.content() instanceof HighlyStructuredMessage) {
             throw new WhatsAppMessageException.Receive.HsmMismatch(
@@ -839,7 +839,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void processSenderKeyDistribution(
-            MessageContainer container,
+            LinkedMessageContainer container,
             MessageReceiveStanza stanza
     ) {
         var skdm = container.senderKeyDistributionMessage().orElse(null);
@@ -919,7 +919,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private boolean shouldHaveDeviceSentMessage(MessageReceiveStanza stanza, MessageContainer container) {
+    private boolean shouldHaveDeviceSentMessage(MessageReceiveStanza stanza, LinkedMessageContainer container) {
         if (!isFromMe(stanza)) {
             return false;
         }
@@ -960,7 +960,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private boolean isProtocolMessageBypass(MessageContainer container) {
+    private boolean isProtocolMessageBypass(LinkedMessageContainer container) {
         if (!(container.content() instanceof ProtocolMessage protocolMessage)) {
             return false;
         }
@@ -980,7 +980,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      *
      * <p>Mirrors WA Web's {@code K(e)} predicate: the stanza's
      * {@code meta.appdata} attribute is {@code "default"} and the decoded
-     * container carries a {@link com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessage}
+     * container carries a {@link com.github.auties00.cobalt.wire.linked.message.group.SenderKeyDistributionMessage}
      * side channel. In that case, the GROUP-direct self message is allowed to
      * arrive without a DSM wrapper because it is a key-rotation bootstrap
      * rather than a user-visible payload.
@@ -991,7 +991,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private boolean isAppdataDefaultSenderKeyOnly(MessageReceiveStanza stanza, MessageContainer container) {
+    private boolean isAppdataDefaultSenderKeyOnly(MessageReceiveStanza stanza, LinkedMessageContainer container) {
         return stanza.appdata().filter("default"::equals).isPresent()
                 && container.senderKeyDistributionMessage().isPresent();
     }
@@ -1023,8 +1023,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceSentMessageProtoUtils", exports = "unwrapDeviceSentMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private MessageContainer unwrapDeviceSentMessage(
-            MessageContainer outerContainer,
+    private LinkedMessageContainer unwrapDeviceSentMessage(
+            LinkedMessageContainer outerContainer,
             DeviceSentMessage dsm,
             MessageReceiveStanza stanza
     ) {
@@ -1122,7 +1122,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     private ChatMessageInfo buildChatMessageInfo(
             MessageReceiveStanza stanza,
             Jid chatJid,
-            MessageContainer container
+            LinkedMessageContainer container
     ) {
         var fromMe = isFromMe(stanza);
         var senderJid = stanza.senderJid().toUserJid();
@@ -1180,7 +1180,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgValidate", exports = "validateContextSource",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void dropInvalidChannelsContextSource(MessageReceiveStanza stanza, MessageContainer container) {
+    private void dropInvalidChannelsContextSource(MessageReceiveStanza stanza, LinkedMessageContainer container) {
         var channelsInvite = stanza.contextSource()
                 .filter(MessageReceiveStanza.CONTEXT_SOURCE_CHANNELS_INVITATION::equals)
                 .isPresent();
@@ -1229,7 +1229,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "validateReportingTokenInfo",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void validateReportingToken(MessageReceiveStanza stanza, MessageContainer container, byte[] plaintext) {
+    private void validateReportingToken(MessageReceiveStanza stanza, LinkedMessageContainer container, byte[] plaintext) {
         if (wamService == null) {
             return;
         }
@@ -1361,7 +1361,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             adaptation = WhatsAppAdaptation.DIRECT)
     private void emitReportingTokenFailure(
             MessageReceiveStanza stanza,
-            MessageContainer container,
+            LinkedMessageContainer container,
             int version,
             ReportingTokenValidationFailureReason reason
     ) {
@@ -1420,7 +1420,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * @param chatJid   the effective chat JID
      * @param container the decoded (and possibly DSM-unwrapped) container
      */
-    private void emitReceiveTelemetry(MessageReceiveStanza stanza, Jid chatJid, MessageContainer container) {
+    private void emitReceiveTelemetry(MessageReceiveStanza stanza, Jid chatJid, LinkedMessageContainer container) {
         if (wamService == null) {
             return;
         }
@@ -1563,7 +1563,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebQbmIncomingMessageLogger", exports = "logQbmIncomingMessages",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void maybeEmitQbmIncomingMessage(MessageReceiveStanza stanza, Jid chatJid, MessageContainer container) {
+    private void maybeEmitQbmIncomingMessage(MessageReceiveStanza stanza, Jid chatJid, LinkedMessageContainer container) {
         if (isFromMe(stanza)) {
             return;
         }
@@ -1618,7 +1618,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebPsStructuredMessageInteractionWamEvent", exports = "PsStructuredMessageInteractionWamEvent",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void maybeEmitStructuredMessageInteraction(MessageReceiveStanza stanza, Jid chatJid, MessageContainer container) {
+    private void maybeEmitStructuredMessageInteraction(MessageReceiveStanza stanza, Jid chatJid, LinkedMessageContainer container) {
         if (isFromMe(stanza)) {
             return;
         }
@@ -1664,7 +1664,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * @return the structured-message class, or {@code null} when the payload is
      *         not structured
      */
-    private static StructuredMessageClass structuredMessageClass(MessageContainer container) {
+    private static StructuredMessageClass structuredMessageClass(LinkedMessageContainer container) {
         return switch (container.content()) {
             case HighlyStructuredMessage ignored -> StructuredMessageClass.HSM;
             case TemplateMessage ignored -> StructuredMessageClass.HSM;
@@ -1768,7 +1768,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * @return {@code true} when the payload carries a forwarded
      *         {@link ContextInfo}
      */
-    private static boolean isForwardedMessage(MessageContainer container) {
+    private static boolean isForwardedMessage(LinkedMessageContainer container) {
         return container.content() instanceof ContextualMessage contextual
                 && contextual.contextInfo().map(ContextInfo::isForwarded).orElse(false);
     }

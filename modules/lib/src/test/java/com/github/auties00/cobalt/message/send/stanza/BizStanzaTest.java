@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code build} result for a regular user JID, which must not carry the
  * privacy-mode attributes WA Web emits only for hosted business accounts.
  * The fixtures use an empty {@link MessageFixtures#temporaryStore(Jid, Jid)}
- * so no {@link com.github.auties00.cobalt.model.business.BusinessVerifiedName}
+ * so no {@link com.github.auties00.cobalt.wire.linked.business.BusinessVerifiedName}
  * record exists for the recipient; the hosted-business positive path is
  * covered by the live-oracle test.
  */

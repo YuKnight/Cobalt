@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.calls.engine.context.CallContext;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.context.CallManager;
 import com.github.auties00.cobalt.calls.engine.event.CallLifecycleEventSink;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 /**
  * Guards every internal state change of a call and implements the {@link CallStateTransition} seam.

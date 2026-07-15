@@ -5,14 +5,14 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.MarketingMessageBroadcastBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageBroadcastAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.business.MarketingMessageBroadcastBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.MarketingMessageBroadcastAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 
@@ -32,7 +32,7 @@ import java.lang.System.Logger.Level;
  *
  * @implNote
  * This implementation persists each association eagerly through
- * {@link LinkedWhatsAppBusinessStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.model.business.MarketingMessageBroadcast)}
+ * {@link LinkedWhatsAppBusinessStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.wire.linked.business.MarketingMessageBroadcast)}
  * keyed by the sent message id, with the premium template id stored as the
  * record's status field. WA Web batches the pairs and mutates the
  * {@code sentMessageIds} set on each premium template once at the end of the
@@ -92,7 +92,7 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      * referenced premium template is unknown locally the mutation is reported
      * as {@link MutationApplicationResult#orphan()}; otherwise the
      * association is persisted via
-     * {@link LinkedWhatsAppBusinessStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.model.business.MarketingMessageBroadcast)}.
+     * {@link LinkedWhatsAppBusinessStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.wire.linked.business.MarketingMessageBroadcast)}.
      *
      * @implNote
      * This implementation classifies a missing index slot as

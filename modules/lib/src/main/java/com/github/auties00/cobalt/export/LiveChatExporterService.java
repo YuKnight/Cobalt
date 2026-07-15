@@ -1,42 +1,43 @@
 package com.github.auties00.cobalt.export;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatExportOptions;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo.StubType;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.FutureProofMessageType;
-import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.commerce.ProductMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.location.LiveLocationMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.*;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.system.KeepInChatMessage;
-import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatExportOptions;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo.StubType;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.linked.message.Message;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.commerce.ProductMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LiveLocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.*;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.KeepInChatMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.PinInChatMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
 import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.ChatExportEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcMessageQueryEventBuilder;
-import com.github.auties00.cobalt.wam.type.ExportModeType;
-import com.github.auties00.cobalt.wam.type.ExportResultType;
-import com.github.auties00.cobalt.wam.type.WebcChatType;
-import com.github.auties00.cobalt.wam.type.WebcMessageQueryDirection;
+import com.github.auties00.cobalt.wire.wam.event.ChatExportEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcMessageQueryEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ExportModeType;
+import com.github.auties00.cobalt.wire.wam.type.ExportResultType;
+import com.github.auties00.cobalt.wire.wam.type.WebcChatType;
+import com.github.auties00.cobalt.wire.wam.type.WebcMessageQueryDirection;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -259,7 +260,7 @@ public final class LiveChatExporterService implements ChatExporterService {
             }
         } catch (RuntimeException error) {
             if (Log.ERROR) {
-                LOGGER.log(Level.ERROR, "chat export failed for " + Log.jid(chat.jid().toString()), error);
+                LOGGER.log(Level.ERROR, "chat export failed for " + new LogRedactable.User(chat.jid().toString()), error);
             }
             wamService.commit(new ChatExportEventBuilder()
                     .chatType(chatType)
@@ -800,7 +801,7 @@ public final class LiveChatExporterService implements ChatExporterService {
      * @param container the quoted message container
      * @return the preview text, never {@code null}
      */
-    private static String quotedBody(MessageContainer container) {
+    private static String quotedBody(LinkedMessageContainer container) {
         if (container.isEmpty()) {
             return "This message was deleted";
         }

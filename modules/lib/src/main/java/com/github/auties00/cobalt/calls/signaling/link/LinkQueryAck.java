@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.calls.signaling.link;
 
-import com.github.auties00.cobalt.model.call.CallLink;
-import com.github.auties00.cobalt.model.call.CallLinkBuilder;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
-import com.github.auties00.cobalt.model.call.CallLinkWaitingRoom;
-import com.github.auties00.cobalt.model.call.CallLinkWaitingRoomBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.call.CallLink;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkBuilder;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkWaitingRoom;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkWaitingRoomBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;

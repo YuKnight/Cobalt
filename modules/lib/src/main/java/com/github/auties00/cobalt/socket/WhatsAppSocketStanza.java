@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 import java.lang.System.Logger.Level;
 import java.time.Duration;

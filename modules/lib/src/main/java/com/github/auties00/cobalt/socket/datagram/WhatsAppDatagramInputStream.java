@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.socket.datagram;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stanza.binary.StanzaReader;
 import com.github.auties00.cobalt.util.AesGcmStreamCipher;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;

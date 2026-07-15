@@ -1,7 +1,8 @@
 
 package com.github.auties00.cobalt.client.linked;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 import com.github.auties00.libsignal.key.SignalIdentityPrivateKey;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
@@ -127,7 +128,7 @@ public final class LinkedWhatsAppClientSixPartsKeys {
         var identityId = Base64.getDecoder().decode(parts[5]);
         var noiseKeyPair = new SignalIdentityKeyPair(noisePublicKey, noisePrivateKey);
         var identityKeyPair = new SignalIdentityKeyPair(identityPublicKey, identityPrivateKey);
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed six-parts credentials for {0}", Log.phone(phoneNumber));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed six-parts credentials for {0}", new LogRedactable.Phone(phoneNumber));
         return new LinkedWhatsAppClientSixPartsKeys(phoneNumber, noiseKeyPair, identityKeyPair, identityId);
     }
 
@@ -156,7 +157,7 @@ public final class LinkedWhatsAppClientSixPartsKeys {
         try {
             return Long.parseUnsignedLong(rawPhoneNumber, rawPhoneNumber.charAt(0) == '+' ? 1 : 0, rawPhoneNumber.length(), 10);
         }catch (NumberFormatException exception) {
-            if (Log.WARNING) LOGGER.log(Level.WARNING, "six-parts credentials: malformed phone number {0}", Log.phone(rawPhoneNumber));
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "six-parts credentials: malformed phone number {0}", new LogRedactable.Phone(rawPhoneNumber));
             throw new IllegalArgumentException("Invalid phone number: " + rawPhoneNumber);
         }
     }

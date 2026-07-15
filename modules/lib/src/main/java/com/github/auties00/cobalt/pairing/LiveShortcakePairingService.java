@@ -7,23 +7,24 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.device.identity.CompanionCommitmentBuilder;
-import com.github.auties00.cobalt.model.device.identity.CompanionEphemeralIdentityBuilder;
-import com.github.auties00.cobalt.model.device.identity.CompanionEphemeralIdentitySpec;
-import com.github.auties00.cobalt.model.device.identity.PrimaryEphemeralIdentity;
-import com.github.auties00.cobalt.model.device.identity.PrimaryEphemeralIdentitySpec;
-import com.github.auties00.cobalt.model.device.pairing.DevicePlatformType;
-import com.github.auties00.cobalt.model.device.pairing.EncryptedPairingRequestBuilder;
-import com.github.auties00.cobalt.model.device.pairing.EncryptedPairingRequestSpec;
-import com.github.auties00.cobalt.model.device.pairing.PairingRequestBuilder;
-import com.github.auties00.cobalt.model.device.pairing.PairingRequestSpec;
-import com.github.auties00.cobalt.model.device.pairing.ProloguePayloadBuilder;
-import com.github.auties00.cobalt.model.device.pairing.ProloguePayloadSpec;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.device.identity.CompanionCommitmentBuilder;
+import com.github.auties00.cobalt.wire.linked.device.identity.CompanionEphemeralIdentityBuilder;
+import com.github.auties00.cobalt.wire.linked.device.identity.CompanionEphemeralIdentitySpec;
+import com.github.auties00.cobalt.wire.linked.device.identity.PrimaryEphemeralIdentity;
+import com.github.auties00.cobalt.wire.linked.device.identity.PrimaryEphemeralIdentitySpec;
+import com.github.auties00.cobalt.wire.linked.device.pairing.DevicePlatformType;
+import com.github.auties00.cobalt.wire.linked.device.pairing.EncryptedPairingRequestBuilder;
+import com.github.auties00.cobalt.wire.linked.device.pairing.EncryptedPairingRequestSpec;
+import com.github.auties00.cobalt.wire.linked.device.pairing.PairingRequestBuilder;
+import com.github.auties00.cobalt.wire.linked.device.pairing.PairingRequestSpec;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ProloguePayloadBuilder;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ProloguePayloadSpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
@@ -227,7 +228,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
 
             sendSetPasskeyPrologue(assertion, ProloguePayloadSpec.encode(prologuePayload));
             stage = ShortcakePairingStage.WAITING_FOR_PRIMARY_IDENTITY;
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shortcake prologue sent, ref={0}", Log.token(ref));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shortcake prologue sent, ref={0}", new LogRedactable.Token(ref));
         }
     }
 
@@ -259,7 +260,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
             var verificationCode = deriveVerificationCode(companionNonce, primaryPublicKey, primaryNonce);
             var encryptionKey = deriveEncryptionKey(primaryPublicKey);
 
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shortcake verification code derived: {0}", Log.code(verificationCode));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shortcake verification code derived: {0}", new LogRedactable.Code(verificationCode));
             var passkeyHandler = (LinkedWhatsAppClientVerificationHandler.Web.Passkey) webVerificationHandler;
             passkeyHandler.handle(verificationCode);
             if (!passkeyHandler.confirmVerificationCode(verificationCode)) {

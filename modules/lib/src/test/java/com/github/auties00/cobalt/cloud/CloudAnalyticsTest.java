@@ -1,16 +1,16 @@
 package com.github.auties00.cobalt.cloud;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudConversationAnalytics;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudConversationAnalyticsQueryBuilder;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudMessagingAnalytics;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudMessagingAnalyticsQueryBuilder;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudPricingAnalytics;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudPricingAnalyticsQueryBuilder;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudTemplateAnalytics;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudTemplateAnalyticsQueryBuilder;
-import com.github.auties00.cobalt.model.cloud.analytics.CloudTemplateGroupAnalyticsQueryBuilder;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudConversationAnalytics;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudConversationAnalyticsQueryBuilder;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudMessagingAnalytics;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudMessagingAnalyticsQueryBuilder;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudPricingAnalytics;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudPricingAnalyticsQueryBuilder;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudTemplateAnalytics;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudTemplateAnalyticsQueryBuilder;
+import com.github.auties00.cobalt.wire.cloud.analytics.CloudTemplateGroupAnalyticsQueryBuilder;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

@@ -4,17 +4,17 @@ import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.wam.TestWamService;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.LockChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.LockChatActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.contact.PinAction;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ArchiveChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.LockChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.LockChatActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.ArchiveChatMutationFactory;
 import com.github.auties00.cobalt.sync.factory.LockChatMutationFactory;
@@ -42,9 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the
- * {@link com.github.auties00.cobalt.model.chat.Chat#locked()},
- * {@link com.github.auties00.cobalt.model.chat.Chat#archived()} and
- * {@link com.github.auties00.cobalt.model.chat.Chat#pinnedTimestamp()}
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat#locked()},
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat#archived()} and
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat#pinnedTimestamp()}
  * read-backs can be asserted directly.
  */
 @DisplayName("LockChatHandler")

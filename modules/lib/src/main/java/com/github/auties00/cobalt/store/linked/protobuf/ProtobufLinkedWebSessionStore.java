@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
-import com.github.auties00.cobalt.model.business.ctwa.CtwaAccessTokenSession;
-import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSession;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.CtwaAccessTokenSession;
+import com.github.auties00.cobalt.wire.linked.business.webgraphql.WhatsAppWebGraphQlSession;
 import com.github.auties00.cobalt.store.linked.LinkedWebSessionStore;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

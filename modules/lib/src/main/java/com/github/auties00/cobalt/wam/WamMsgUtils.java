@@ -3,31 +3,31 @@ package com.github.auties00.cobalt.wam;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
-import com.github.auties00.cobalt.model.message.commerce.ProductMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.event.EventMessage;
-import com.github.auties00.cobalt.model.message.event.EventResponseMessage;
-import com.github.auties00.cobalt.model.message.list.ListMessage;
-import com.github.auties00.cobalt.model.message.list.ListResponseMessage;
-import com.github.auties00.cobalt.model.message.location.LiveLocationMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.*;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.wam.type.E2eDeviceType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageChatType;
-import com.github.auties00.cobalt.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.commerce.OrderMessage;
+import com.github.auties00.cobalt.wire.linked.message.commerce.ProductMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EventMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.list.ListMessage;
+import com.github.auties00.cobalt.wire.linked.message.list.ListResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LiveLocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.*;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.PinInChatMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.wam.type.E2eDeviceType;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MessageChatType;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
 
 /**
  * Classifies messages into the WAM {@link MediaType}, {@link MessageType},
@@ -35,7 +35,7 @@ import com.github.auties00.cobalt.wam.type.MessageType;
  * the WAM send and receive metric emitters.
  *
  * <p>These are pure, stateless functions: each derives a telemetry
- * bucketing dimension from a {@link MessageContainer}, a
+ * bucketing dimension from a {@link LinkedMessageContainer}, a
  * {@link ChatMessageInfo}, a {@link Jid}, or a parser-level stanza type,
  * with no dependency on session state. They are split out of
  * {@link WamService} (which owns the stateful batching and upload
@@ -57,8 +57,8 @@ public final class WamMsgUtils {
      * Returns the WAM {@link MediaType} classification for the
      * payload carried by the given {@link ChatMessageInfo}.
      *
-     * <p>This resolves the wrapped {@link MessageContainer} and forwards to
-     * {@link #getWamMediaType(MessageContainer)}; the WAM send and receive
+     * <p>This resolves the wrapped {@link LinkedMessageContainer} and forwards to
+     * {@link #getWamMediaType(LinkedMessageContainer)}; the WAM send and receive
      * metric loggers use it to tag every event with the payload shape so
      * the WA backend can bucket telemetry per media kind.
      * {@link MediaType#NONE} is returned for {@code null} and for
@@ -77,7 +77,7 @@ public final class WamMsgUtils {
 
     /**
      * Returns the WAM {@link MediaType} classification for the
-     * resolved content of the given {@link MessageContainer}.
+     * resolved content of the given {@link LinkedMessageContainer}.
      *
      * <p>This mirrors WA Web's {@code getWamMediaType} switch on
      * {@code e.type}: every branch of the upstream string switch maps to
@@ -106,7 +106,7 @@ public final class WamMsgUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public static MediaType getWamMediaType(MessageContainer container) {
+    public static MediaType getWamMediaType(LinkedMessageContainer container) {
         if (container == null) {
             return MediaType.NONE;
         }

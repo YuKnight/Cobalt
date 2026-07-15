@@ -13,14 +13,14 @@ import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
 import com.github.auties00.cobalt.message.send.stanza.TcTokenStanza;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.privacy.LiveTrustedContactTokenService;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
@@ -76,7 +76,7 @@ class UserMessageSenderTest {
                         .withUserFanout(chat -> List.of(PEER_DEVICE_PRIMARY, PEER_DEVICE_COMPANION))
                         .withEnsureSessions(devices -> 0));
 
-        var info = chatMessage("3EB0USR0001", PEER_LID, MessageContainer.of("hi"));
+        var info = chatMessage("3EB0USR0001", PEER_LID, LinkedMessageContainer.of("hi"));
         sender.send(PEER_LID, info);
 
         var stanza = captured.get();
@@ -115,7 +115,7 @@ class UserMessageSenderTest {
                 StubDeviceService.create()
                         .withUserFanout(chat -> List.of(PEER_DEVICE_PRIMARY, PEER_DEVICE_COMPANION)));
 
-        sender.send(PEER_LID, chatMessage("3EB0479001", PEER_LID, MessageContainer.of("479 guard")));
+        sender.send(PEER_LID, chatMessage("3EB0479001", PEER_LID, LinkedMessageContainer.of("479 guard")));
 
         var stanza = captured.get();
         var participants = stanza.getChild("participants").orElseThrow();
@@ -140,7 +140,7 @@ class UserMessageSenderTest {
         var sender = userMessageSender(client, senderStore,
                 StubDeviceService.create().withUserFanout(chat -> List.of(PEER_DEVICE_PRIMARY)));
 
-        sender.send(PEER_LID, chatMessage("3EB0IDENT01", PEER_LID, MessageContainer.of("hi")));
+        sender.send(PEER_LID, chatMessage("3EB0IDENT01", PEER_LID, LinkedMessageContainer.of("hi")));
 
         var stanza = captured.get();
         assertTrue(stanza.getChild("device-identity").isPresent(),
@@ -164,7 +164,7 @@ class UserMessageSenderTest {
                             return 0;
                         }));
 
-        sender.send(PEER_LID, chatMessage("3EB0ENS001", PEER_LID, MessageContainer.of("hi")));
+        sender.send(PEER_LID, chatMessage("3EB0ENS001", PEER_LID, LinkedMessageContainer.of("hi")));
 
         assertEquals(1, ensureCalls.size(), "ensureSessions must be called exactly once per send");
         assertTrue(ensureCalls.getFirst().contains(PEER_DEVICE_PRIMARY),
@@ -205,7 +205,7 @@ class UserMessageSenderTest {
     }
 
     private static ChatMessageInfo chatMessage(
-            String id, Jid chatJid, MessageContainer container) {
+            String id, Jid chatJid, LinkedMessageContainer container) {
         var key = new MessageKeyBuilder()
                 .id(id)
                 .parentJid(chatJid)

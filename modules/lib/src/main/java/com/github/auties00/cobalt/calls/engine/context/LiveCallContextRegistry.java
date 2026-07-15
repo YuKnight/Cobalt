@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.calls.engine.context;
 
 import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
 import com.github.auties00.cobalt.calls.engine.state.CallStateMachine;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.Call;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.Call;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

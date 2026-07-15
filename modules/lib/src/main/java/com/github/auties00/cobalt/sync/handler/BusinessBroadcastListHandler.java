@@ -2,18 +2,18 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.business.BroadcastListParticipant;
-import com.github.auties00.cobalt.model.business.BroadcastListParticipantBuilder;
-import com.github.auties00.cobalt.model.business.BusinessBroadcastListBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.business.BroadcastListParticipant;
+import com.github.auties00.cobalt.wire.linked.business.BroadcastListParticipantBuilder;
+import com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastListBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastListAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -81,7 +81,7 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      * {@inheritDoc}
      *
      * <p>For {@link SyncdOperation#SET} mutations, upserts a
-     * {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList}
+     * {@link com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList}
      * keyed by the {@code listId} in index slot 1, mirroring the full
      * {@link BusinessBroadcastListAction} wire shape including participants,
      * label ids, audience expression, and the {@link BusinessBroadcastListAction#deleted()}

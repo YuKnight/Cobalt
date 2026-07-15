@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessage;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRangeBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessage;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRange;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRangeBuilder;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -244,7 +244,7 @@ final class MessageRangeUtils {
      * @implNote
      * This implementation mirrors WA Web's {@code replaceMessageRangeRemoteJid}
      * by rebuilding each
-     * {@link com.github.auties00.cobalt.model.message.MessageKey} with the
+     * {@link com.github.auties00.cobalt.wire.core.message.MessageKey} with the
      * supplied {@link Jid} stamped into {@code parentJid}, preserving the
      * existing {@code fromMe}, {@code id}, and {@code senderJid} fields.
      *

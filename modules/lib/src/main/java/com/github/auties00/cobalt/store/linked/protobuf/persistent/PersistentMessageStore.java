@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoSpec;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoSpec;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoSpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfoSpec;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 import org.h2.mvstore.Cursor;
@@ -382,7 +382,7 @@ final class PersistentMessageStore implements AutoCloseable {
      *
      * @apiNote
      * Called from {@link PersistentNewsletter#getMessageById(String)} and from
-     * {@link PersistentLinkedWhatsAppChatStore#findMessageById(com.github.auties00.cobalt.model.newsletter.Newsletter, String)}
+     * {@link PersistentLinkedWhatsAppChatStore#findMessageById(com.github.auties00.cobalt.wire.linked.newsletter.Newsletter, String)}
      * as the fast path before the per-newsletter scan fallback.
      *
      * @param newsletterJid the JID identifying the owning newsletter

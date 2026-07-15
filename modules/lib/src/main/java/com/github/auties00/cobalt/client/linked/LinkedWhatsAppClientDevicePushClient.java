@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client.linked;
 
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.registration.push.NoopMobilePushClient;
 import com.github.auties00.cobalt.registration.push.apns.ApnsClient;
 import com.github.auties00.cobalt.registration.push.fcm.FcmClient;

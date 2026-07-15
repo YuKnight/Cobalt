@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -8,32 +8,33 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppIntegrityChallengeException;
 import com.github.auties00.cobalt.listener.linked.LinkedNewContactListener;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.stanza.smax.coexistence.SmaxCoexistenceOffboardingNotificationResponse;
-import com.github.auties00.cobalt.stanza.smax.coexistence.SmaxCoexistenceOnboardingStatusNotificationResponse;
-import com.github.auties00.cobalt.stanza.smax.newsletters.SmaxNewslettersLiveUpdatesNotificationResponse;
-import com.github.auties00.cobalt.stanza.smax.newsletters.SmaxNewslettersLiveUpdatesNotificationResponse.NewsletterMessage;
+import com.github.auties00.cobalt.wire.stanza.smax.coexistence.SmaxCoexistenceOffboardingNotificationResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.coexistence.SmaxCoexistenceOnboardingStatusNotificationResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.newsletters.SmaxNewslettersLiveUpdatesNotificationResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.newsletters.SmaxNewslettersLiveUpdatesNotificationResponse.NewsletterMessage;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.pairing.ShortcakePairingService;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
-import com.github.auties00.cobalt.model.newsletter.NewsletterPollVote;
-import com.github.auties00.cobalt.model.newsletter.NewsletterReaction;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterPollVote;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterReaction;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.sync.action.device.WaffleAccountLinkStateAction;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.ChatMessageCountsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.ChatMessageCountsEventBuilder;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -503,7 +504,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         } catch (Throwable throwable) {
             if (Log.DEBUG) {
                 LOGGER.log(Level.DEBUG,
-                        "cannot refresh invited contact metadata for " + Log.jid(String.valueOf(receiver)),
+                        "cannot refresh invited contact metadata for " + new LogRedactable.User(String.valueOf(receiver)),
                         throwable);
             }
         }
@@ -699,7 +700,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
     /**
      * Inserts or updates a content post's {@link NewsletterMessageInfo}.
      *
-     * <p>Decodes the {@code <plaintext>} payload into a {@link MessageContainer}; returns {@code null}
+     * <p>Decodes the {@code <plaintext>} payload into a {@link LinkedMessageContainer}; returns {@code null}
      * when the payload is absent (a WAMO placeholder) or fails to decode, so the caller can fall back
      * to add-on-only resolution. An existing message with the same {@code server_id} has its content
      * and timestamp refreshed in place, preserving its stored add-ons; otherwise a fresh
@@ -832,7 +833,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
     }
 
     /**
-     * Decodes a newsletter {@code <plaintext>} payload into a {@link MessageContainer}.
+     * Decodes a newsletter {@code <plaintext>} payload into a {@link LinkedMessageContainer}.
      *
      * <p>Returns {@code null} rather than throwing when the payload cannot be parsed, matching the
      * newsletter receive path which treats an undecodable payload as a silent drop.
@@ -840,9 +841,9 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
      * @param plaintext the raw protobuf payload bytes
      * @return the decoded container, or {@code null} when the payload cannot be parsed
      */
-    private MessageContainer decodeContainer(byte[] plaintext) {
+    private LinkedMessageContainer decodeContainer(byte[] plaintext) {
         try {
-            return MessageContainerSpec.decode(plaintext);
+            return LinkedMessageContainerSpec.decode(plaintext);
         } catch (Throwable throwable) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cannot decode newsletter live-update payload", throwable);
             return null;

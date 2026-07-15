@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.engine;
 
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * Sends an outbound {@code <call><offer>} stanza and returns the synchronous call ack the server replies

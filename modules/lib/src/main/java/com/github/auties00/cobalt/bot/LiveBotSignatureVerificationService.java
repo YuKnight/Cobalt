@@ -1,18 +1,18 @@
 package com.github.auties00.cobalt.bot;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppBotSignatureException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.bot.feedback.BotSignatureVerificationMetadata;
-import com.github.auties00.cobalt.model.bot.feedback.BotSignatureVerificationUseCaseProof;
-import com.github.auties00.cobalt.model.bot.feedback.BotSignatureVerificationUseCaseProof.BotSignatureUseCase;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.bot.feedback.BotSignatureVerificationMetadata;
+import com.github.auties00.cobalt.wire.linked.bot.feedback.BotSignatureVerificationUseCaseProof;
+import com.github.auties00.cobalt.wire.linked.bot.feedback.BotSignatureVerificationUseCaseProof.BotSignatureUseCase;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.CertificateValidationEventEventBuilder;
-import com.github.auties00.cobalt.wam.type.CertVerificationResultType;
+import com.github.auties00.cobalt.wire.wam.event.CertificateValidationEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.CertVerificationResultType;
 
 import java.io.ByteArrayInputStream;
 import java.lang.System.Logger.Level;

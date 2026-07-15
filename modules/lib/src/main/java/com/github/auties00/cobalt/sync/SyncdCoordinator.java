@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.sync;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MdCriticalEventEventBuilder;
-import com.github.auties00.cobalt.wam.type.Collection;
-import com.github.auties00.cobalt.wam.type.MdSyncdCriticalEventCode;
+import com.github.auties00.cobalt.wire.wam.event.MdCriticalEventEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.Collection;
+import com.github.auties00.cobalt.wire.wam.type.MdSyncdCriticalEventCode;
 
 import java.lang.System.Logger.Level;
 import java.util.EnumSet;
@@ -333,7 +333,7 @@ public final class SyncdCoordinator {
 
     /**
      * Reports a critical syncd processing fault as a WAM
-     * {@link com.github.auties00.cobalt.wam.event.MdCriticalEventEvent}.
+     * {@link com.github.auties00.cobalt.wire.wam.event.MdCriticalEventEvent}.
      *
      * <p>WhatsApp Web funnels every unrecoverable app-state condition (a message
      * range that fails validation, a malformed pending mutation, invalid action

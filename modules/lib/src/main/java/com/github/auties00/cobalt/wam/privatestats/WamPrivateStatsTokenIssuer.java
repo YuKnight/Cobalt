@@ -2,17 +2,17 @@ package com.github.auties00.cobalt.wam.privatestats;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppPrivateStatsTokenIssuerException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.SignCredentialEvent;
-import com.github.auties00.cobalt.wam.event.SignCredentialEventBuilder;
-import com.github.auties00.cobalt.wam.type.ApplicationState;
-import com.github.auties00.cobalt.wam.type.SignCredentialResult;
+import com.github.auties00.cobalt.wire.wam.event.SignCredentialEvent;
+import com.github.auties00.cobalt.wire.wam.event.SignCredentialEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ApplicationState;
+import com.github.auties00.cobalt.wire.wam.type.SignCredentialResult;
 
 import java.lang.System.Logger.Level;
 import java.security.MessageDigest;

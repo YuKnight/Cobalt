@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.CallMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * Sends a call link or waiting room IQ request and returns the reply the controller parses.

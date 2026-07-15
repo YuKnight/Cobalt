@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.store.linked.protobuf.temporary;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.store.linked.protobuf.*;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientSixPartsKeys;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
 import java.lang.System.Logger.Level;

@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.ack.MessageAck;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.stanza.*;
@@ -14,36 +14,36 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.business.profile.BusinessAutomatedType;
-import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.FutureProofMessageType;
-import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageThreadId;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.business.profile.BusinessAutomatedType;
+import com.github.auties00.cobalt.wire.linked.business.profile.BusinessProfile;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.linked.message.Message;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.MessageThreadId;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.MdDeviceSyncAckEventBuilder;
-import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
-import com.github.auties00.cobalt.wam.event.StructuredMessageBuyerInteractionEventBuilder;
-import com.github.auties00.cobalt.wam.type.BizPlatform;
-import com.github.auties00.cobalt.wam.type.InteractionType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageChatType;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
-import com.github.auties00.cobalt.wam.type.SizeBucket;
-import com.github.auties00.cobalt.wam.type.StructuredMessageClass;
+import com.github.auties00.cobalt.wire.wam.event.MdDeviceSyncAckEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.StructuredMessageBuyerInteractionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.BizPlatform;
+import com.github.auties00.cobalt.wire.wam.type.InteractionType;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MessageChatType;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wire.wam.type.SizeBucket;
+import com.github.auties00.cobalt.wire.wam.type.StructuredMessageClass;
 
 import java.lang.System.Logger.Level;
 import java.util.Collection;
@@ -991,7 +991,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
 
     /**
      * Commits one
-     * {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * {@link com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEvent} per
      * depleted one-time pre-key reported by the last
      * {@link DeviceService#ensureSessions(Collection)} call.
      *

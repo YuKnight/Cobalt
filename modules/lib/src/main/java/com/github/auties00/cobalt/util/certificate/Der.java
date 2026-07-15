@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.util.certificate;
 
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;

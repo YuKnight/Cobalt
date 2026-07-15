@@ -33,11 +33,11 @@ class ClientWiringSourceTest {
     @DisplayName("LiveCallsService is constructed before LiveNodeStreamService in the client constructor")
     void constructionOrder() {
         var src = read(CLIENT);
-        var calls2At = src.indexOf("new LiveCallsService(");
+        var callsAt = src.indexOf("new LiveCallsService(");
         var streamAt = src.indexOf("new LiveNodeStreamService(");
-        assertTrue(calls2At >= 0, "client must construct LiveCallsService");
+        assertTrue(callsAt >= 0, "client must construct LiveCallsService");
         assertTrue(streamAt >= 0, "client must construct LiveNodeStreamService");
-        assertTrue(calls2At < streamAt,
+        assertTrue(callsAt < streamAt,
                 "LiveCallsService must be constructed before LiveNodeStreamService so the inbound call "
                         + "receiver never dispatches to a null service");
     }

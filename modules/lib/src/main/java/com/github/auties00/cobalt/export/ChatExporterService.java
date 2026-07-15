@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.export;
 
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatExportOptions;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatExportOptions;
 
 import java.io.OutputStream;
 

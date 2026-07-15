@@ -6,10 +6,10 @@ import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotification;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotificationBuilder;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncNotification;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncNotificationBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Exercises the history-sync cycle end to end: a {@link HistorySyncNotification}
  * peer message drives {@link WebHistorySyncService} to fetch (or read the inline)
  * encrypted blob, AES-CBC decrypt it, validate the HMAC, inflate the gzip stream,
- * decode a {@link com.github.auties00.cobalt.model.sync.history.HistorySync}
+ * decode a {@link com.github.auties00.cobalt.wire.linked.sync.history.HistorySync}
  * payload, and fan the chunk out to
  * {@link LinkedWhatsAppClientListener} callbacks and
  * the {@link LidMigrationService}. The pipeline is wired in-process via

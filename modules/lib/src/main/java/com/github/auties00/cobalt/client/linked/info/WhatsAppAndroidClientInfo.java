@@ -3,8 +3,9 @@ package com.github.auties00.cobalt.client.linked.info;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.util.PlayStoreUtils;
 import net.dongliu.apk.parser.ByteArrayApkFile;
 import net.dongliu.apk.parser.bean.ApkSigner;
@@ -581,7 +582,7 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
             mac.update(String.valueOf(nationalPhoneNumber).getBytes(StandardCharsets.UTF_8));
             var token = URLEncoder.encode(Base64.getEncoder().encodeToString(mac.doFinal()), StandardCharsets.UTF_8);
             if (Log.DEBUG) {
-                LOGGER.log(Level.DEBUG, "computed android registration token for {0}, business {1}", Log.phone(nationalPhoneNumber), business);
+                LOGGER.log(Level.DEBUG, "computed android registration token for {0}, business {1}", new LogRedactable.Phone(nationalPhoneNumber), business);
             }
             return token;
         }catch (GeneralSecurityException exception) {

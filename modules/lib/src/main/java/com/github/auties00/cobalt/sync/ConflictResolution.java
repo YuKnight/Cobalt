@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.sync;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 /**

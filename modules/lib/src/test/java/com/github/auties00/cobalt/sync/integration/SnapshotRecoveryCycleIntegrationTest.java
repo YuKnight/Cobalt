@@ -3,9 +3,9 @@ import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * validation during a per-collection apply: the companion requests the corrected
  * snapshot from the primary, waits for the response, decodes it, and replaces the
  * local collection state. Recovery is gated on the primary advertising support,
- * the {@link com.github.auties00.cobalt.model.props.ABProp#ENABLE_PEER_SNAPSHOT_RECOVERY}
+ * the {@link com.github.auties00.cobalt.wire.linked.props.ABProp#ENABLE_PEER_SNAPSHOT_RECOVERY}
  * prop, the collection not being CRITICAL_BLOCK, and the mutation count staying
  * within the configured maximum. The {@link SnapshotRecoveryService} is wired
  * in-process via {@link TestWhatsAppClient}. The synthetic group asserts the

@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.sync.factory;
 
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueSpec;
-import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction.InteractiveMessageActionMode;
-import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueSpec;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.InteractiveMessageAction.InteractiveMessageActionMode;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.InteractiveMessageActionBuilder;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

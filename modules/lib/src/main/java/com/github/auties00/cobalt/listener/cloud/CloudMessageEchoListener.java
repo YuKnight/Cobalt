@@ -3,7 +3,8 @@ package com.github.auties00.cobalt.listener.cloud;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.message.MessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageInfo;
 
 /**
  * A functional interface for the {@link CloudWhatsAppClientListener#onMessageEcho onMessageEcho}

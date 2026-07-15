@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client.linked;
-import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
-import com.github.auties00.cobalt.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.github.auties00.cobalt.client.WhatsAppClient;
@@ -11,115 +11,115 @@ import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.emoji.WhatsAppEmoji;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.call.CallInteraction;
-import com.github.auties00.cobalt.model.call.IncomingCall;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallInteraction;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
 import com.github.auties00.cobalt.exception.*;
 import com.github.auties00.cobalt.exception.linked.*;
 import com.github.auties00.cobalt.exception.linked.web.*;
-import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
-import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.wire.graphql.facebook.FacebookGraphQlOperation;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.WhatsAppGraphQlOperation;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.bot.profile.BotDirectory;
-import com.github.auties00.cobalt.model.bot.profile.BotProfile;
-import com.github.auties00.cobalt.model.business.*;
-import com.github.auties00.cobalt.model.business.acs.AnonymousCredentialIssuance;
-import com.github.auties00.cobalt.model.business.acs.AnonymousCredentialIssuanceRequest;
-import com.github.auties00.cobalt.model.business.acs.AnonymousCredentialServiceConfig;
-import com.github.auties00.cobalt.model.business.ads.*;
-import com.github.auties00.cobalt.model.business.ai.*;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelAgentStatus;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelCommand;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelIdentity;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelLinkedStatus;
-import com.github.auties00.cobalt.model.business.auth.*;
-import com.github.auties00.cobalt.model.business.cart.BusinessCartRefresh;
-import com.github.auties00.cobalt.model.business.cart.BusinessCartRefreshOptions;
-import com.github.auties00.cobalt.model.business.cart.BusinessRefreshedCart;
-import com.github.auties00.cobalt.model.business.catalog.*;
-import com.github.auties00.cobalt.model.business.compliance.BusinessMerchantCompliance;
-import com.github.auties00.cobalt.model.business.compliance.MerchantComplianceEdit;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingEligibility;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingEligibilityQuery;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingServiceData;
-import com.github.auties00.cobalt.model.business.ctwa.*;
-import com.github.auties00.cobalt.model.business.flow.BusinessFlowMetadata;
-import com.github.auties00.cobalt.model.business.linking.BusinessAccountNonce;
-import com.github.auties00.cobalt.model.business.linking.BusinessEligibility;
-import com.github.auties00.cobalt.model.business.linking.BusinessLinkedAccounts;
-import com.github.auties00.cobalt.model.business.linking.BusinessLinkedAdAccounts;
-import com.github.auties00.cobalt.model.business.marketing.*;
-import com.github.auties00.cobalt.model.business.order.BusinessOrder;
-import com.github.auties00.cobalt.model.business.order.BusinessOrderItem;
-import com.github.auties00.cobalt.model.business.order.OrderLifecycleStatus;
-import com.github.auties00.cobalt.model.business.order.OrderPaymentStatus;
-import com.github.auties00.cobalt.model.chat.ChatExportOptions;
-import com.github.auties00.cobalt.model.business.postcode.BusinessPostcodeVerification;
-import com.github.auties00.cobalt.model.business.postcode.BusinessPostcodeVerificationResult;
-import com.github.auties00.cobalt.model.business.profile.*;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionActionLog;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionLogAcknowledgement;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionSurfaceBatch;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionTriggerContext;
-import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSession;
-import com.github.auties00.cobalt.model.business.subscription.BusinessSubscriptionEntryPoints;
-import com.github.auties00.cobalt.model.business.subscription.BusinessSubscriptions;
-import com.github.auties00.cobalt.model.business.support.*;
-import com.github.auties00.cobalt.model.business.waa.*;
-import com.github.auties00.cobalt.model.call.CallLink;
-import com.github.auties00.cobalt.model.call.CallLinkCreate;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
-import com.github.auties00.cobalt.model.call.CallLog;
-import com.github.auties00.cobalt.model.chat.*;
-import com.github.auties00.cobalt.model.chat.community.*;
-import com.github.auties00.cobalt.model.chat.group.*;
-import com.github.auties00.cobalt.model.contact.*;
-import com.github.auties00.cobalt.model.federated.*;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.jid.LidChange;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.media.SizedInputStream;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallCreationMessage;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallEditMessage;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.group.GroupInviteMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.newsletter.*;
-import com.github.auties00.cobalt.model.payment.BrazilCustomPaymentMethod;
-import com.github.auties00.cobalt.model.payment.BrazilCustomPaymentMethodCreate;
-import com.github.auties00.cobalt.model.payment.PaymentsTosV3ConsumerVariant;
-import com.github.auties00.cobalt.model.preference.*;
-import com.github.auties00.cobalt.model.privacy.*;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.model.reporting.*;
-import com.github.auties00.cobalt.model.setting.*;
-import com.github.auties00.cobalt.model.setting.notice.UserNoticeBundle;
-import com.github.auties00.cobalt.model.setting.notice.UserNoticeStage;
-import com.github.auties00.cobalt.model.setting.notice.UserNoticeStageQuery;
-import com.github.auties00.cobalt.model.setting.privacy.ContactBlacklistAddressingMode;
-import com.github.auties00.cobalt.model.setting.privacy.OptOutListUpdate;
-import com.github.auties00.cobalt.model.setting.push.PushConfig;
-import com.github.auties00.cobalt.model.signal.*;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
-import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethod;
-import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
-import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.stanza.iq.IqStanza;
-import com.github.auties00.cobalt.stanza.mex.MexStanza;
-import com.github.auties00.cobalt.stanza.smax.SmaxStanza;
-import com.github.auties00.cobalt.stanza.usync.UsyncQuery;
-import com.github.auties00.cobalt.stanza.usync.UsyncResult;
+import com.github.auties00.cobalt.wire.linked.bot.profile.BotDirectory;
+import com.github.auties00.cobalt.wire.linked.bot.profile.BotProfile;
+import com.github.auties00.cobalt.wire.linked.business.*;
+import com.github.auties00.cobalt.wire.linked.business.acs.AnonymousCredentialIssuance;
+import com.github.auties00.cobalt.wire.linked.business.acs.AnonymousCredentialIssuanceRequest;
+import com.github.auties00.cobalt.wire.linked.business.acs.AnonymousCredentialServiceConfig;
+import com.github.auties00.cobalt.wire.linked.business.ads.*;
+import com.github.auties00.cobalt.wire.linked.business.ai.*;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelAgentStatus;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelCommand;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelIdentity;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelLinkedStatus;
+import com.github.auties00.cobalt.wire.linked.business.auth.*;
+import com.github.auties00.cobalt.wire.linked.business.cart.BusinessCartRefresh;
+import com.github.auties00.cobalt.wire.linked.business.cart.BusinessCartRefreshOptions;
+import com.github.auties00.cobalt.wire.linked.business.cart.BusinessRefreshedCart;
+import com.github.auties00.cobalt.wire.linked.business.catalog.*;
+import com.github.auties00.cobalt.wire.linked.business.compliance.BusinessMerchantCompliance;
+import com.github.auties00.cobalt.wire.linked.business.compliance.MerchantComplianceEdit;
+import com.github.auties00.cobalt.wire.linked.business.crossposting.CrossPostingEligibility;
+import com.github.auties00.cobalt.wire.linked.business.crossposting.CrossPostingEligibilityQuery;
+import com.github.auties00.cobalt.wire.linked.business.crossposting.CrossPostingServiceData;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.*;
+import com.github.auties00.cobalt.wire.linked.business.flow.BusinessFlowMetadata;
+import com.github.auties00.cobalt.wire.linked.business.linking.BusinessAccountNonce;
+import com.github.auties00.cobalt.wire.linked.business.linking.BusinessEligibility;
+import com.github.auties00.cobalt.wire.linked.business.linking.BusinessLinkedAccounts;
+import com.github.auties00.cobalt.wire.linked.business.linking.BusinessLinkedAdAccounts;
+import com.github.auties00.cobalt.wire.linked.business.marketing.*;
+import com.github.auties00.cobalt.wire.linked.business.order.BusinessOrder;
+import com.github.auties00.cobalt.wire.linked.business.order.BusinessOrderItem;
+import com.github.auties00.cobalt.wire.linked.business.order.OrderLifecycleStatus;
+import com.github.auties00.cobalt.wire.linked.business.order.OrderPaymentStatus;
+import com.github.auties00.cobalt.wire.linked.chat.ChatExportOptions;
+import com.github.auties00.cobalt.wire.linked.business.postcode.BusinessPostcodeVerification;
+import com.github.auties00.cobalt.wire.linked.business.postcode.BusinessPostcodeVerificationResult;
+import com.github.auties00.cobalt.wire.linked.business.profile.*;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionActionLog;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionLogAcknowledgement;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionSurfaceBatch;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionTriggerContext;
+import com.github.auties00.cobalt.wire.linked.business.webgraphql.WhatsAppWebGraphQlSession;
+import com.github.auties00.cobalt.wire.linked.business.subscription.BusinessSubscriptionEntryPoints;
+import com.github.auties00.cobalt.wire.linked.business.subscription.BusinessSubscriptions;
+import com.github.auties00.cobalt.wire.linked.business.support.*;
+import com.github.auties00.cobalt.wire.linked.business.waa.*;
+import com.github.auties00.cobalt.wire.linked.call.CallLink;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkCreate;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
+import com.github.auties00.cobalt.wire.linked.call.CallLog;
+import com.github.auties00.cobalt.wire.linked.chat.*;
+import com.github.auties00.cobalt.wire.linked.chat.community.*;
+import com.github.auties00.cobalt.wire.linked.chat.group.*;
+import com.github.auties00.cobalt.wire.linked.contact.*;
+import com.github.auties00.cobalt.wire.linked.federated.*;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.core.jid.LidChange;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.stanza.model.SizedInputStream;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.call.ScheduledCallCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.call.ScheduledCallEditMessage;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.group.GroupInviteMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.newsletter.*;
+import com.github.auties00.cobalt.wire.linked.payment.BrazilCustomPaymentMethod;
+import com.github.auties00.cobalt.wire.linked.payment.BrazilCustomPaymentMethodCreate;
+import com.github.auties00.cobalt.wire.linked.payment.PaymentsTosV3ConsumerVariant;
+import com.github.auties00.cobalt.wire.linked.preference.*;
+import com.github.auties00.cobalt.wire.linked.privacy.*;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.reporting.*;
+import com.github.auties00.cobalt.wire.linked.setting.*;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNoticeBundle;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNoticeStage;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNoticeStageQuery;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.ContactBlacklistAddressingMode;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.OptOutListUpdate;
+import com.github.auties00.cobalt.wire.linked.setting.push.PushConfig;
+import com.github.auties00.cobalt.wire.linked.signal.*;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.RecentEmojiWeight;
+import com.github.auties00.cobalt.wire.linked.sync.action.payment.CustomPaymentMethod;
+import com.github.auties00.cobalt.wire.linked.sync.action.payment.PaymentTosAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.setting.NotificationActivitySettingAction;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.stanza.iq.IqStanza;
+import com.github.auties00.cobalt.wire.stanza.mex.MexStanza;
+import com.github.auties00.cobalt.wire.stanza.smax.SmaxStanza;
+import com.github.auties00.cobalt.wire.stanza.usync.UsyncQuery;
+import com.github.auties00.cobalt.wire.stanza.usync.UsyncResult;
 import com.github.auties00.cobalt.store.linked.*;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.util.BusinessLabelConstants;
@@ -4457,7 +4457,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Primary outgoing-message entry point: prepares the raw
-     * {@link MessageContainer} into a populated {@link ChatMessageInfo}
+     * {@link LinkedMessageContainer} into a populated {@link ChatMessageInfo}
      * (or {@link NewsletterMessageInfo} for newsletter JIDs),
      * encrypts per-device, and dispatches through the chat, group,
      * status, or newsletter sender appropriate to the JID server.
@@ -4484,10 +4484,10 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *                                                        chat type
      */
     @Override
-    MessageKey sendMessage(JidProvider jid, MessageContainer container);
+    MessageKey sendMessage(JidProvider jid, LinkedMessageContainer container);
 
     /**
-     * Sends a pre-built {@link MessageInfo} without re-running the
+     * Sends a pre-built {@link LinkedMessageInfo} without re-running the
      * preparer pipeline.
      *
      * @apiNote
@@ -4497,7 +4497,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * populated; typical scenarios are rehydrating a draft or
      * re-transmitting a message that failed a previous send. Wraps
      * the same dispatch
-     * {@link #sendMessage(JidProvider, MessageContainer)} uses.
+     * {@link #sendMessage(JidProvider, LinkedMessageContainer)} uses.
      *
      * @param messageInfo the fully-populated outgoing message
      * @throws NullPointerException                           if
@@ -4510,7 +4510,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *                                                        supported
      *                                                        chat type
      */
-    void sendMessage(MessageInfo messageInfo);
+    void sendMessage(LinkedMessageInfo messageInfo);
 
     /**
      * Edits the body of a previously sent message.
@@ -4529,7 +4529,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws IllegalArgumentException if {@code originalKey} has no
      *                                  {@code parentJid}
      */
-    void editMessage(MessageKey originalKey, MessageContainer newContent);
+    void editMessage(MessageKey originalKey, LinkedMessageContainer newContent);
 
     /**
      * Deletes a message locally or for every participant in the chat.
@@ -4569,7 +4569,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *                               message could not be stored after
      *                               sending
      */
-    ChatMessageInfo sendStatus(MessageContainer content);
+    ChatMessageInfo sendStatus(LinkedMessageContainer content);
 
     /**
      * Revokes a previously posted status update.
@@ -4593,7 +4593,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Mirrors the status-reshare composer flow: the source message's text or media is re-posted as a
-     * fresh status carrying a {@link com.github.auties00.cobalt.model.message.status.StatusAttribution.Type#RESHARE}
+     * fresh status carrying a {@link com.github.auties00.cobalt.wire.linked.message.status.StatusAttribution.Type#RESHARE}
      * attribution crediting the original. Text is copied directly; image and video media are
      * re-downloaded and re-uploaded so the reshared status owns independent media. Resharing a
      * newsletter status adds a channel-reshare attribution identifying the originating channel and
@@ -4697,7 +4697,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @apiNote
      * Drives the multi-select "Forward to" picker: resolves each
      * source key against the local store, extracts the
-     * {@link MessageContainer}, and sends it to every destination in
+     * {@link LinkedMessageContainer}, and sends it to every destination in
      * turn. Unresolvable source keys and unsendable destinations are
      * skipped silently.
      *
@@ -5180,7 +5180,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @apiNote
      * Drives the "New broadcast list" creation flow on the Business
      * chat list. Use the returned JID to subsequently send messages
-     * with {@link #sendBroadcast(JidProvider, MessageContainer)}.
+     * with {@link #sendBroadcast(JidProvider, LinkedMessageContainer)}.
      *
      * @param name       the display name of the broadcast list
      * @param recipients the recipient JIDs
@@ -5233,7 +5233,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @return the resulting chat-message metadata
      * @throws NullPointerException if any argument is {@code null}
      */
-    ChatMessageInfo sendBroadcast(JidProvider broadcastListId, MessageContainer message);
+    ChatMessageInfo sendBroadcast(JidProvider broadcastListId, LinkedMessageContainer message);
 
     /**
      * Assigns the given chat to the given agent.
@@ -7126,7 +7126,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * re-encoded as MJPEG with a derived micro-thumbnail, videos as
      * H.264 / AAC MP4 with a faststart moov, audio as 48 kHz stereo AAC
      * (M4A) or, for push-to-talk
-     * {@link com.github.auties00.cobalt.model.message.media.AudioMessage
+     * {@link com.github.auties00.cobalt.wire.linked.message.media.AudioMessage
      * audio messages}, as 16 kHz mono Opus (OGG) plus the wire-format
      * waveform, stickers as a 512x512 WebP, documents pass through with
      * a PDF page-zero thumbnail and page count when applicable, and slots
@@ -7138,8 +7138,8 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * {@code mediaDirectPath}, {@code mediaKey},
      * {@code mediaKeyTimestamp}, {@code mediaSha256}, and
      * {@code mediaEncryptedSha256} so the same {@link MediaProvider} can
-     * immediately be embedded in an outgoing {@link MessageContainer}
-     * and dispatched through {@link #sendMessage(JidProvider, MessageContainer)}.
+     * immediately be embedded in an outgoing {@link LinkedMessageContainer}
+     * and dispatched through {@link #sendMessage(JidProvider, LinkedMessageContainer)}.
      * Uses the cached media connection held by the store and blocks
      * until the first {@code media_conn} refresh has landed.
      *
@@ -8690,7 +8690,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * {@code status}. Callers supply only the user-typed fields
      * ({@code reason} code and optional {@code subject}); the wire
      * fields (target JID, message id or server id, timestamp) are
-     * derived from the supplied {@link MessageInfo}.
+     * derived from the supplied {@link LinkedMessageInfo}.
      *
      * @param status  the non-{@code null} offending status post
      * @param reason  the non-{@code null} spam-flow code identifying
@@ -8704,7 +8704,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws WhatsAppServerRuntimeException  if the relay rejected the request
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
-    void reportStatus(MessageInfo status, String reason, String subject);
+    void reportStatus(LinkedMessageInfo status, String reason, String subject);
 
     /**
      * Registers this device's user-journey analytics session id with

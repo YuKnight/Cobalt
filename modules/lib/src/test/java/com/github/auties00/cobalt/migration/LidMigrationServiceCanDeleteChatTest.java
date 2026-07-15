@@ -1,16 +1,16 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
-import com.github.auties00.cobalt.model.chat.ChatDisappearingModeBuilder;
-import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.chat.ChatMute;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatDisappearingMode;
+import com.github.auties00.cobalt.wire.linked.chat.ChatDisappearingModeBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMute;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +56,7 @@ class LidMigrationServiceCanDeleteChatTest {
                 .build();
         return new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.empty())
+                .message(LinkedMessageContainer.empty())
                 .stubType(stubType)
                 .timestamp(ts)
                 .build();
@@ -70,7 +70,7 @@ class LidMigrationServiceCanDeleteChatTest {
                 .build();
         return new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.of("hello"))
+                .message(LinkedMessageContainer.of("hello"))
                 .timestamp(ts)
                 .build();
     }
@@ -83,7 +83,7 @@ class LidMigrationServiceCanDeleteChatTest {
                 .build();
         return new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.empty())
+                .message(LinkedMessageContainer.empty())
                 .broadcast(true)
                 .timestamp(ts)
                 .build();
@@ -273,7 +273,7 @@ class LidMigrationServiceCanDeleteChatTest {
                 .build();
         var msg = new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.of("not empty"))
+                .message(LinkedMessageContainer.of("not empty"))
                 .stubType(ChatMessageInfo.StubType.E2E_ENCRYPTED)
                 .timestamp(Instant.now())
                 .build();

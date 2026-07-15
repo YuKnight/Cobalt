@@ -1,15 +1,16 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -146,7 +147,7 @@ public final class NotificationDeviceStreamHandler extends SocketStreamHandler.C
             } catch (Throwable throwable) {
                 if (Log.WARNING) {
                     LOGGER.log(Level.WARNING,
-                            "handleDevicesNotification - " + actionType + " error for " + Log.jid(entryJid.toString()),
+                            "handleDevicesNotification - " + actionType + " error for " + new LogRedactable.User(entryJid.toString()),
                             throwable);
                 }
             }

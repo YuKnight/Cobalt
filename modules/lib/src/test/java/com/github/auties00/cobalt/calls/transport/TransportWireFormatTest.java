@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.calls.transport;
 
-import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions;
-import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsBuilder;
-import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsEntryBuilder;
-import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsSpec;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptions;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptionsBuilder;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptionsEntryBuilder;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptionsSpec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

@@ -1,13 +1,14 @@
 package com.github.auties00.cobalt.cloud;
+import com.github.auties00.cobalt.wire.core.message.EmptyContent;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.cloud.CloudAppStateSyncAction;
-import com.github.auties00.cobalt.model.cloud.CloudCallDirection;
-import com.github.auties00.cobalt.model.cloud.CloudCallStatus;
-import com.github.auties00.cobalt.model.cloud.CloudSystemUpdate;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowStatusUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentsUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudAppStateSyncAction;
+import com.github.auties00.cobalt.wire.cloud.CloudCallDirection;
+import com.github.auties00.cobalt.wire.cloud.CloudCallStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudSystemUpdate;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowStatusUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponentsUpdate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Decode cells for the webhook fields folded into existing or new listeners: business-initiated
@@ -125,7 +127,7 @@ class CloudWebhookFieldsTest {
                 "system":{"body":"changed","type":"customer_changed_number","new_wa_id":"573000000002"}}]}""");
         var messages = CloudWebhookDecoder.decodeMessages(value);
         assertEquals(1, messages.size());
-        assertTrue(messages.getFirst().message().isEmpty());
+        assertSame(EmptyContent.of(), messages.getFirst().message().content());
     }
 
     @Test

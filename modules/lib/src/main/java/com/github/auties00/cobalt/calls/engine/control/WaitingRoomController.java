@@ -9,8 +9,9 @@ import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomLeaveSt
 import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomToggleAck;
 import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomToggleStanza;
 import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomUser;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.util.List;
@@ -196,7 +197,7 @@ public final class WaitingRoomController {
         Objects.requireNonNull(linkToken, "linkToken cannot be null");
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "leaving call link lobby {0} for call {1}",
-                    Log.token(linkToken), context.callId());
+                    new LogRedactable.Token(linkToken), context.callId());
         }
         var request = new WaitingRoomLeaveStanza(context.callId(), context.callCreator(), Optional.of(linkToken));
         return WaitingRoomLeaveAck.of(iqSender.sendForReply(request));

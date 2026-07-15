@@ -3,9 +3,9 @@ package com.github.auties00.cobalt.calls.crypto;
 import com.github.auties00.cobalt.calls.signaling.session.CallEncOptions;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,7 +19,7 @@ import java.util.Optional;
  * participant device. Unlike the offer's call key fanout, a rekey is NOT one stanza carrying a
  * per device {@code <destination>} block: each connected participant emits its OWN {@code <enc_rekey>}
  * stanza, addressed unicast to ONE recipient device, carrying exactly ONE {@code <enc>} child (the
- * Signal ciphertext of {@code MessageContainer{Call{callKey}}}). This record models one such unicast
+ * Signal ciphertext of {@code LinkedMessageContainer{Call{callKey}}}). This record models one such unicast
  * slot: the addressed device, the Signal envelope, and whether the envelope bootstraps a new session
  * (so the sender knows it must attach its {@code <device-identity>}).
  *
@@ -35,13 +35,13 @@ import java.util.Optional;
  * @implNote This implementation models the unicast rekey slot as a single {@code <enc>} per stanza
  * (NOT a per device fanout), an {@code <encopt keygen="2"/>} sibling matching the offer's keygen
  * version, and a {@code <device-identity>} attached only on a {@code pkmsg} envelope. The plaintext the
- * {@code <enc>} encrypts is the SAME {@code MessageContainer{Call{callKey}}} structure as the offer key
+ * {@code <enc>} encrypts is the SAME {@code LinkedMessageContainer{Call{callKey}}} structure as the offer key
  * (a single thirty two byte raw key); the three per domain rekey keys (audio, video, appdata) are
  * derived LOCALLY from this one key, not transmitted.
  *
  * @param recipientDevice the participant device this rekey slot is addressed to; never {@code null}
  * @param type            the Signal envelope variant of the {@code <enc>} payload; never {@code null}
- * @param ciphertext      the Signal ciphertext of {@code MessageContainer{Call{callKey}}}; never
+ * @param ciphertext      the Signal ciphertext of {@code LinkedMessageContainer{Call{callKey}}}; never
  *                        {@code null}
  * @param deviceIdentity  the ADV device identity bytes to attach when {@code type} is
  *                        {@link MessageEncryptionType#PKMSG}, or {@code null} when none is available

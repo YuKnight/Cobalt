@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.video;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVChannelLayout;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
@@ -22,9 +22,9 @@ import com.github.auties00.cobalt.media.transcode.avio.AvioReadBuffer;
 import com.github.auties00.cobalt.media.transcode.avio.AvioWriteBuffer;
 import com.github.auties00.cobalt.media.transcode.image.ImagePipeline;
 import com.github.auties00.cobalt.media.transcode.image.JpegCleaner;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.message.media.VideoMessage;
-import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.wire.linked.message.media.VideoMessage;
+import com.github.auties00.cobalt.wire.linked.sync.action.setting.SettingsSyncAction;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;

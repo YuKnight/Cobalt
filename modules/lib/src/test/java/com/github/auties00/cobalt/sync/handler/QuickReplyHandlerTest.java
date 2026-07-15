@@ -3,16 +3,16 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.preference.QuickReplyBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
-import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.preference.QuickReplyBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.QuickReplyAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.QuickReplyActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.QuickReplyMutationFactory;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link QuickReplyHandler}: a {@link SyncdOperation#SET} with {@code deleted=true}
  * drops the entry by id; a {@code SET} with non-empty {@code shortcut} and {@code message}
- * upserts a {@link com.github.auties00.cobalt.model.preference.QuickReply} keyed by
+ * upserts a {@link com.github.auties00.cobalt.wire.linked.preference.QuickReply} keyed by
  * {@code indexParts[1]}; a missing id, a missing {@link QuickReplyAction} payload, an
  * empty {@code shortcut}, or an empty {@code message} surface as
  * {@link SyncActionState#MALFORMED}; non-{@code SET} operations surface as

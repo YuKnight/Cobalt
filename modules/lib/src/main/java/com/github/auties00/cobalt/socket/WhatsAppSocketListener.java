@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.exception.WhatsAppException;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * Receives the post-handshake events that a {@link WhatsAppSocketClient}

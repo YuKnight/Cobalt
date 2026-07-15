@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.exception.cloud;
 
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
 
 /**
  * Thrown when an operation requires a newer Cloud API version than the one the client is configured

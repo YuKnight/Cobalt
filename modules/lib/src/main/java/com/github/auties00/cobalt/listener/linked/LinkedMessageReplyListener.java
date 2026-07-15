@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.listener.linked;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.model.message.MessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
 
 /**
  * A functional interface for the {@link LinkedWhatsAppClientListener#onMessageReply onMessageReply} event.
@@ -24,5 +24,5 @@ public non-sealed interface LinkedMessageReplyListener extends LinkedListener {
      * @param response the reply message
      * @param quoted   the message being replied to
      */
-    void onMessageReply(LinkedWhatsAppClient whatsapp, MessageInfo response, MessageInfo quoted);
+    void onMessageReply(LinkedWhatsAppClient whatsapp, LinkedMessageInfo response, LinkedMessageInfo quoted);
 }

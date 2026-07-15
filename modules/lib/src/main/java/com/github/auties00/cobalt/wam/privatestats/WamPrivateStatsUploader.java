@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.PsBufferUploadEventBuilder;
-import com.github.auties00.cobalt.wam.type.ApplicationState;
-import com.github.auties00.cobalt.wam.type.PsBufferUploadResult;
+import com.github.auties00.cobalt.wire.wam.event.PsBufferUploadEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ApplicationState;
+import com.github.auties00.cobalt.wire.wam.type.PsBufferUploadResult;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

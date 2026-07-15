@@ -5,17 +5,17 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.CallInfoUserJourneyEventBuilder;
-import com.github.auties00.cobalt.wam.event.PreCallUserJourneyCallsTabEventBuilder;
-import com.github.auties00.cobalt.wam.event.RingtoneScreenEventBuilder;
-import com.github.auties00.cobalt.wam.type.CallSizeBucket;
-import com.github.auties00.cobalt.wam.type.CallSizeType;
-import com.github.auties00.cobalt.wam.type.CallType;
-import com.github.auties00.cobalt.wam.type.CallsTabSource;
-import com.github.auties00.cobalt.wam.type.ParticipantActionSource;
-import com.github.auties00.cobalt.wam.type.PreCallActionType;
-import com.github.auties00.cobalt.wam.type.RingtoneEntryType;
-import com.github.auties00.cobalt.wam.type.SubSurface;
+import com.github.auties00.cobalt.wire.wam.event.CallInfoUserJourneyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PreCallUserJourneyCallsTabEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.RingtoneScreenEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.CallSizeBucket;
+import com.github.auties00.cobalt.wire.wam.type.CallSizeType;
+import com.github.auties00.cobalt.wire.wam.type.CallType;
+import com.github.auties00.cobalt.wire.wam.type.CallsTabSource;
+import com.github.auties00.cobalt.wire.wam.type.ParticipantActionSource;
+import com.github.auties00.cobalt.wire.wam.type.PreCallActionType;
+import com.github.auties00.cobalt.wire.wam.type.RingtoneEntryType;
+import com.github.auties00.cobalt.wire.wam.type.SubSurface;
 
 import java.util.Objects;
 
@@ -26,7 +26,7 @@ import java.util.Objects;
  * generate.
  *
  * <p>None of the three events wired here map to a Cobalt feature. Cobalt embeds a
- * headless VoIP engine (the {@code calls2} package) that can place and answer
+ * headless VoIP engine (the {@code calls} package) that can place and answer
  * calls, but it renders no Calls tab, no pre-call funnel, no call-info
  * participant list, and no ringtone picker, so it never raises the
  * user-journey and settings-screen telemetry a genuine client emits while the
@@ -57,9 +57,9 @@ import java.util.Objects;
  * genuine client without over-reporting).
  *
  * @see WamService
- * @see com.github.auties00.cobalt.wam.event.PreCallUserJourneyCallsTabEvent
- * @see com.github.auties00.cobalt.wam.event.CallInfoUserJourneyEvent
- * @see com.github.auties00.cobalt.wam.event.RingtoneScreenEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.PreCallUserJourneyCallsTabEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.CallInfoUserJourneyEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.RingtoneScreenEvent
  */
 @WhatsAppWebModule(moduleName = "WAWebPreCallUserJourneyLogger")
 @WhatsAppWebModule(moduleName = "WAWebPreCallUserJourneyCallsTabWamEvent")

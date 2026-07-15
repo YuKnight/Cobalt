@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.media.transcode.sticker;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.alibaba.fastjson2.JSON;
 
 import java.lang.System.Logger.Level;
@@ -20,7 +20,7 @@ import java.util.Objects;
  * <p>This type is invoked by {@link StickerPipeline} after libwebp has produced a 512x512 extended-WebP encode of the
  * source image. The metadata payload is the sticker descriptor dictionary WhatsApp ships on the wire (publisher, pack
  * id, emoji list, accessibility text, sticker-maker source type and so on); {@link StickerPipeline#run(
- * com.github.auties00.cobalt.model.media.MediaProvider, java.nio.channels.SeekableByteChannel, Map)} documents the
+ * com.github.auties00.cobalt.wire.linked.media.MediaProvider, java.nio.channels.SeekableByteChannel, Map)} documents the
  * canonical field set. The descriptor is serialised to JSON and embedded as a new EXIF RIFF chunk appended to the end
  * of the input stream.
  *

@@ -6,19 +6,19 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.PttDailyEventBuilder;
-import com.github.auties00.cobalt.wam.event.PttEventBuilder;
-import com.github.auties00.cobalt.wam.event.PttMessageUserJourneyEventBuilder;
-import com.github.auties00.cobalt.wam.event.PttPlaybackEventBuilder;
-import com.github.auties00.cobalt.wam.type.ChatbarInitialState;
-import com.github.auties00.cobalt.wam.type.PttMessageUserJourneyAction;
-import com.github.auties00.cobalt.wam.type.PttPlaybackSpeedType;
-import com.github.auties00.cobalt.wam.type.PttResultType;
-import com.github.auties00.cobalt.wam.type.PttSourceType;
-import com.github.auties00.cobalt.wam.type.PttStreamType;
-import com.github.auties00.cobalt.wam.type.PttTriggerType;
-import com.github.auties00.cobalt.wam.type.TsSurface;
-import com.github.auties00.cobalt.wam.type.UserJourneyChatType;
+import com.github.auties00.cobalt.wire.wam.event.PttDailyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PttEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PttMessageUserJourneyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.PttPlaybackEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ChatbarInitialState;
+import com.github.auties00.cobalt.wire.wam.type.PttMessageUserJourneyAction;
+import com.github.auties00.cobalt.wire.wam.type.PttPlaybackSpeedType;
+import com.github.auties00.cobalt.wire.wam.type.PttResultType;
+import com.github.auties00.cobalt.wire.wam.type.PttSourceType;
+import com.github.auties00.cobalt.wire.wam.type.PttStreamType;
+import com.github.auties00.cobalt.wire.wam.type.PttTriggerType;
+import com.github.auties00.cobalt.wire.wam.type.TsSurface;
+import com.github.auties00.cobalt.wire.wam.type.UserJourneyChatType;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -32,19 +32,19 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>WhatsApp Web instruments four voice-note surfaces that have no headless
  * counterpart. The composer recording session logs a {@code Ptt} event
- * ({@link com.github.auties00.cobalt.wam.event.PttEvent}, id 458) when a
+ * ({@link com.github.auties00.cobalt.wire.wam.event.PttEvent}, id 458) when a
  * recording completes, carrying the result, source, duration, encoded size and
  * the draft-review interaction counters. The playback logger logs a
  * {@code PttPlayback} event
- * ({@link com.github.auties00.cobalt.wam.event.PttPlaybackEvent}, id 2044) when a
+ * ({@link com.github.auties00.cobalt.wire.wam.event.PttPlaybackEvent}, id 2044) when a
  * note finishes playing, carrying the stream type, trigger, playback speed,
  * duration, played fraction and mini-player interaction counters. The daily
  * stats task flushes a {@code PttDaily} event
- * ({@link com.github.auties00.cobalt.wam.event.PttDailyEvent}, id 2938) that
+ * ({@link com.github.auties00.cobalt.wire.wam.event.PttDailyEvent}, id 2938) that
  * aggregates the day's record, send, cancel, lock, draft-review, playback,
  * fast-playback, paused-record, out-of-chat and stop-tap counts partitioned by
  * conversation kind. The chatbar funnel logs a {@code PttMessageUserJourney}
- * event ({@link com.github.auties00.cobalt.wam.event.PttMessageUserJourneyEvent},
+ * event ({@link com.github.auties00.cobalt.wire.wam.event.PttMessageUserJourneyEvent},
  * id 5402) at each stage of recording, previewing and sending a note.
  *
  * <p>None of these map to a Cobalt feature: Cobalt is a headless JVM client with

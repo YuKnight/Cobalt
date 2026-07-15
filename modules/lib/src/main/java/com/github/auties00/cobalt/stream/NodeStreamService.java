@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.stream;
 
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * Routes every inbound WhatsApp stanza to the {@link SocketStreamHandler} registered for its tag.

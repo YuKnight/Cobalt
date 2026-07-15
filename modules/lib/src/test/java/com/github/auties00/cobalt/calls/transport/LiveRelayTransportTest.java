@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.transport;
 
-import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreams;
-import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreamsBuilder;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SrtpAfbStreams;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SrtpAfbStreamsBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

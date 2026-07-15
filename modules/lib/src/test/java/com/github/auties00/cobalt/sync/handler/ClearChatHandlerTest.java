@@ -3,22 +3,22 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessage;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRangeBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.ClearChatActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessage;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRange;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRangeBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ClearChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ClearChatActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.ClearChatMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,7 +110,7 @@ class ClearChatHandlerTest {
             var chat = client.store().chatStore().addNewChat(PEER);
             chat.addMessage(new ChatMessageInfoBuilder()
                     .key(new MessageKeyBuilder().id("m1").fromMe(false).parentJid(PEER).build())
-                    .message(MessageContainer.of("hi"))
+                    .message(LinkedMessageContainer.of("hi"))
                     .timestamp(Instant.now())
                     .build());
             assertEquals(1, chat.messageCount());

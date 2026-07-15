@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.listener.linked;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
 
-import com.github.auties00.cobalt.model.call.IncomingCall;
+import com.github.auties00.cobalt.wire.linked.call.IncomingCall;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 
 /**
@@ -22,7 +22,7 @@ public non-sealed interface LinkedCallListener extends LinkedListener {
      * <p>The listener must respond by calling
      * {@link LinkedWhatsAppClient#acceptCall(IncomingCall, com.github.auties00.cobalt.calls.stream.AudioOutput, com.github.auties00.cobalt.calls.stream.AudioInput)}
      * or
-     * {@link LinkedWhatsAppClient#rejectCall(IncomingCall, com.github.auties00.cobalt.model.call.CallEndReason)}
+     * {@link LinkedWhatsAppClient#rejectCall(IncomingCall, com.github.auties00.cobalt.wire.linked.call.CallEndReason)}
      * with the supplied offer within the WhatsApp-imposed offer timeout
      * (about 30 seconds); otherwise the offer expires. The listener is
      * invoked from the call layer's signaling thread, so long-running

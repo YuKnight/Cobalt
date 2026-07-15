@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.device.icdc;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVEncryptionType;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -15,7 +15,7 @@ import java.util.Optional;
  * user's device list.
  *
  * <p>An instance is produced by
- * {@link IcdcComputer#compute(com.github.auties00.cobalt.model.jid.Jid)} and
+ * {@link IcdcComputer#compute(com.github.auties00.cobalt.wire.core.jid.Jid)} and
  * consumed by the outbound message encoder to populate the
  * {@code deviceListMetadata} field of {@code messageContextInfo} on every
  * outgoing multi-device message. It carries the four values the recipient

@@ -1,14 +1,15 @@
 package com.github.auties00.cobalt.device.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.state.SignalPreKeyBundle;
@@ -461,7 +462,7 @@ public final class DevicePreKeyHandler {
             } catch (Exception e) {
                 if (Log.WARNING) {
                     var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
-                    LOGGER.log(Level.WARNING, "failed to parse prekey bundle for " + Log.jid(jid), e);
+                    LOGGER.log(Level.WARNING, "failed to parse prekey bundle for " + new LogRedactable.User(jid), e);
                 }
             }
         }
@@ -848,7 +849,7 @@ public final class DevicePreKeyHandler {
             } catch (Exception e) {
                 if (Log.WARNING) {
                     var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
-                    LOGGER.log(Level.WARNING, "failed to store identity key for " + Log.jid(jid), e);
+                    LOGGER.log(Level.WARNING, "failed to store identity key for " + new LogRedactable.User(jid), e);
                 }
             }
         }

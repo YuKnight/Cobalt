@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.calls.media.audio.codec.opus;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.bindings.CobaltOpus;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.cobalt.util.NativeLibLoader;
 
 import java.lang.System.Logger.Level;

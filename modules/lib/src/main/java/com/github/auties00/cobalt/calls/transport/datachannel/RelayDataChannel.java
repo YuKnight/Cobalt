@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.sctp.Message;
 import com.github.auties00.sctp.PayloadProtocolId;
 import com.github.auties00.sctp.SctpImplementation;

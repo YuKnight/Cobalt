@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.client.linked.info;
 
-import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
-import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType;
 
 /**
  * Sealed root of the client identity that Cobalt advertises to WhatsApp servers during the Noise handshake and registration.

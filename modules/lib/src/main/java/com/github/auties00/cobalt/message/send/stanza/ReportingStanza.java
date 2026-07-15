@@ -1,22 +1,22 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.send.token.ReportingToken;
 import com.github.auties00.cobalt.message.send.token.ReportingTokenContent;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.Message;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.lang.System.Logger.Level;
@@ -70,7 +70,7 @@ public final class ReportingStanza {
      * {@code remoteJid} is the recipient for 1:1 sends, the group JID for group sends, or the status JID for status
      * broadcasts. All three inputs are folded into the HMAC key.
      *
-     * @implNote This implementation encodes the full {@link MessageContainerSpec} and then runs the sparse projector
+     * @implNote This implementation encodes the full {@link LinkedMessageContainerSpec} and then runs the sparse projector
      * {@link ReportingTokenContent#compute(byte[], int)} to retain only the field numbers whitelisted for the current
      * sender version. The message is always re-encoded because the reporting-token-content cache is upstream of this
      * call.
@@ -101,7 +101,7 @@ public final class ReportingStanza {
             return null;
         }
 
-        var fullProto = MessageContainerSpec.encode(messageInfo.message());
+        var fullProto = LinkedMessageContainerSpec.encode(messageInfo.message());
         var serializedProto = ReportingTokenContent.compute(fullProto, senderVersion);
 
         var id = messageInfo.key().id();

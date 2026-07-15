@@ -2,14 +2,14 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.call.CallLogAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
@@ -18,15 +18,15 @@ import java.lang.System.Logger.Level;
 /**
  * Maintains the cross-device VoIP call history from inbound {@code call_log} app-state mutations.
  *
- * <p>This is the calls2 inbound counterpart of the end-of-call output produced by
+ * <p>This is the calls inbound counterpart of the end-of-call output produced by
  * {@link com.github.auties00.cobalt.calls.telemetry.CallLogSync}: when a call ends, is rejected, or is
  * missed on any device of the account,
  * the originating device pushes a {@code call_log} mutation, the server replays it onto every other
  * device, and the dispatcher routes the decoded mutation here. A {@link SyncdOperation#SET} carries a
  * {@link CallLogAction} whose {@link CallLogAction#log()} record is mirrored into the runtime call-history
  * table through
- * {@link LinkedWhatsAppChatStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)},
- * keyed by the record's own {@link com.github.auties00.cobalt.model.call.CallLog#callId()}; a
+ * {@link LinkedWhatsAppChatStore#addCallLog(com.github.auties00.cobalt.wire.linked.call.CallLog)},
+ * keyed by the record's own {@link com.github.auties00.cobalt.wire.linked.call.CallLog#callId()}; a
  * {@link SyncdOperation#REMOVE} drops the record named by the {@code callId} in index slot two through
  * {@link LinkedWhatsAppChatStore#removeCallLog(String)}.
  *
@@ -38,7 +38,7 @@ import java.lang.System.Logger.Level;
  * @implNote This implementation reproduces the inbound half of the engine call-log host-event seam (the
  * native {@code send_1to1_call_log_update_event} host event {@code 0x8a} in {@code events.cc}) as a plain
  * app-state handler. It keys the runtime table by the
- * record-internal {@link com.github.auties00.cobalt.model.call.CallLog#callId()} rather than by WA Web's
+ * record-internal {@link com.github.auties00.cobalt.wire.linked.call.CallLog#callId()} rather than by WA Web's
  * composite {@code callerJid|callId|fromMe} index, and rejects a SET whose record carries no call id as
  * {@link MutationApplicationResult#malformed()}, because the store has no composite key to fall back to.
  * The WA Web pairing-timestamp filter and the one-minute {@code shouldHideInConversation} window are
@@ -120,10 +120,10 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      *
      * <p>For a {@link SyncdOperation#SET} mutation, validates that the action is a {@link CallLogAction}
      * carrying a {@link CallLogAction#log()} record with a non-empty
-     * {@link com.github.auties00.cobalt.model.call.CallLog#callId()}, validates that the index carries at
+     * {@link com.github.auties00.cobalt.wire.linked.call.CallLog#callId()}, validates that the index carries at
      * least the four segments {@code ["call_log", callerJid, callId, fromMe]}, and mirrors the record into
      * the runtime call-history table through
-     * {@link LinkedWhatsAppChatStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)}.
+     * {@link LinkedWhatsAppChatStore#addCallLog(com.github.auties00.cobalt.wire.linked.call.CallLog)}.
      * For a {@link SyncdOperation#REMOVE} mutation, reads the call id from index slot
      * {@value #CALL_ID_INDEX} and drops the matching record through
      * {@link LinkedWhatsAppChatStore#removeCallLog(String)}. Any other operation

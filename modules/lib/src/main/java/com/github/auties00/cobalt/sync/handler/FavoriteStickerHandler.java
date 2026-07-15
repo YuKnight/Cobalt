@@ -2,14 +2,14 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.media.StickerAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.StickerAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
@@ -89,7 +89,7 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#orphan(String, String)}. When
      * {@link StickerAction#isFavorite()} is set the sticker is timestamped and
      * added via
-     * {@link LinkedWhatsAppSettingsStore#addFavouriteSticker(String, com.github.auties00.cobalt.model.preference.Sticker)};
+     * {@link LinkedWhatsAppSettingsStore#addFavouriteSticker(String, com.github.auties00.cobalt.wire.linked.preference.Sticker)};
      * otherwise it is removed via
      * {@link LinkedWhatsAppSettingsStore#removeFavouriteSticker(String)}.
      *

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.Objects;
 

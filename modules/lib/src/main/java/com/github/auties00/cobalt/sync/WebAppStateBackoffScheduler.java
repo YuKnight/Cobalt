@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
 import java.io.Closeable;

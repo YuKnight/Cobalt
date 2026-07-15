@@ -2,15 +2,16 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.business.CustomerDataAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.CustomerDataAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.lang.System.Logger.Level;
@@ -102,7 +103,7 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
 
             var chatJid = Jid.of(chatJidString);
             if (chatJid == null) {
-                if (Log.WARNING) LOGGER.log(Level.WARNING, "customer data: chat jid failed to parse, jid={0}", Log.jid(chatJidString));
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "customer data: chat jid failed to parse, jid={0}", new LogRedactable.User(chatJidString));
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

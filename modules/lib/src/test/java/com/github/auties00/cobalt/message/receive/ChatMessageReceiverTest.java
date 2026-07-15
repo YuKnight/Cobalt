@@ -6,12 +6,12 @@ import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.wam.TestWamService;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -27,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * {@link MessageEncryption} produces a PKMSG ciphertext, it is wrapped in a synthetic inbound
  * {@code <message>} stanza, and handed to the recipient's {@link ChatMessageReceiver}, which must
  * decrypt, decode the protobuf, and return a populated
- * {@link com.github.auties00.cobalt.model.chat.ChatMessageInfo} carrying the sender's original
- * {@link MessageContainer}. Both sides share libsignal session state installed by
+ * {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo} carrying the sender's original
+ * {@link LinkedMessageContainer}. Both sides share libsignal session state installed by
  * {@link TestSignalSession#establishSession} before the first encrypt.
  */
 @DisplayName("ChatMessageReceiver")
@@ -40,20 +40,20 @@ class ChatMessageReceiverTest {
     private static final Jid SENDER_BARE = Jid.of("12025550100@s.whatsapp.net");
 
     @Test
-    @DisplayName("PKMSG receive: decrypts to the sender's MessageContainer and returns a populated ChatMessageInfo")
+    @DisplayName("PKMSG receive: decrypts to the sender's LinkedMessageContainer and returns a populated ChatMessageInfo")
     void receivePkmsgRoundTrip() {
         var senderStore = MessageFixtures.temporaryStore(SENDER_BARE, null);
         var recipientStore = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
         TestSignalSession.establishSession(senderStore, RECIPIENT_PRIMARY, recipientStore);
 
-        var senderContainer = MessageContainer.of("hello from sender");
+        var senderContainer = LinkedMessageContainer.of("hello from sender");
         var senderEncryption = new MessageEncryption(senderStore,
                 new SignalSessionCipher(senderStore.signalStore()),
                 new SignalGroupCipher(senderStore.signalStore()),
                 new SignalCryptoLocks());
         var payload = senderEncryption.encryptForDevice(
                 RECIPIENT_PRIMARY,
-                MessageContainerSpec.encode(senderContainer));
+                LinkedMessageContainerSpec.encode(senderContainer));
 
         var inbound = new StanzaBuilder()
                 .description("message")
@@ -108,12 +108,12 @@ class ChatMessageReceiverTest {
 
         var firstPayload = senderEncryption.encryptForDevice(
                 RECIPIENT_PRIMARY,
-                MessageContainerSpec.encode(MessageContainer.of("first")));
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("first")));
         receiver.receive(buildInbound("3EB0RCV0010", "pkmsg", firstPayload.ciphertext()), SENDER_PRIMARY);
 
         var secondPayload = senderEncryption.encryptForDevice(
                 RECIPIENT_PRIMARY,
-                MessageContainerSpec.encode(MessageContainer.of("second")));
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("second")));
         var info = receiver.receive(buildInbound("3EB0RCV0011", "pkmsg", secondPayload.ciphertext()), SENDER_PRIMARY);
 
         var receivedText = (ExtendedTextMessage) info.message().content();

@@ -3,8 +3,8 @@ package com.github.auties00.cobalt.media.transcode.text;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.message.MessageFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessageBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.TestWamService;
@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers the short-circuit no-op branches of
- * {@link com.github.auties00.cobalt.media.transcode.text.TextPipeline#run(com.github.auties00.cobalt.model.jid.Jid, com.github.auties00.cobalt.model.message.text.ExtendedTextMessage)}
+ * {@link com.github.auties00.cobalt.media.transcode.text.TextPipeline#run(com.github.auties00.cobalt.wire.core.jid.Jid, com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage)}
  * ({@code null} message, the {@code disableLinkPreviews} privacy flag, an
  * empty body, and a body with no URL) that bail before any HTTP or cache
  * interaction. The HTTP-fetching branches are not covered here because the

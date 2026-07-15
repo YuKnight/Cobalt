@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
-import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.mixin.InstantMillisMixin;
+import com.github.auties00.cobalt.wire.core.mixin.InstantSecondsMixin;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppWamStore;
 import com.github.auties00.cobalt.wam.model.WamChannel;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingCounters;

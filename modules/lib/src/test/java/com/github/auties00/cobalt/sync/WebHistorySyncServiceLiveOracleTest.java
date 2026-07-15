@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.sync;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
-import com.github.auties00.cobalt.model.sync.history.HistorySync;
+import com.github.auties00.cobalt.wire.linked.message.system.history.HistorySyncType;
+import com.github.auties00.cobalt.wire.linked.sync.history.HistorySync;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;

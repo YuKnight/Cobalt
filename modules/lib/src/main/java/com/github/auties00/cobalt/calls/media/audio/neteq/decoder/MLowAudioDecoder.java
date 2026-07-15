@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowDecoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowTocByte;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.postfilter.MlowDecodePostfilter;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.Objects;

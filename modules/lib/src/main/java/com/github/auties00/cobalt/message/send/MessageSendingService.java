@@ -2,18 +2,18 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
 
 /**
  * Single entry point for the outgoing-message send pipeline.
  *
- * <p>The service prepares a raw {@link MessageContainer} into a fully-populated
- * {@link MessageInfo}, dedupes concurrent sends keyed by message id, and routes by the parent
+ * <p>The service prepares a raw {@link LinkedMessageContainer} into a fully-populated
+ * {@link LinkedMessageInfo}, dedupes concurrent sends keyed by message id, and routes by the parent
  * JID's server kind: 1:1 PN or LID chats, groups and communities, status broadcasts, business
  * broadcast lists, and {@code @newsletter} publishes each take a dedicated wire path. Peer
  * protocol messages addressed to one of the account's own devices bypass the chat routing and go
@@ -21,7 +21,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
  *
  * @implSpec
  * Implementations must reject a second concurrent send carrying the same wire id and must route
- * every send by the {@link MessageInfo} subtype combined with the parent JID's server kind.
+ * every send by the {@link LinkedMessageInfo} subtype combined with the parent JID's server kind.
  */
 public interface MessageSendingService {
     /**
@@ -35,23 +35,23 @@ public interface MessageSendingService {
      * chat-kind-specific path.
      *
      * @implSpec
-     * Implementations must prepare {@code container} into a {@link MessageInfo} (using the
+     * Implementations must prepare {@code container} into a {@link LinkedMessageInfo} (using the
      * newsletter path for {@code @newsletter} recipients and the chat path otherwise) and then
-     * dispatch it through {@link #send(MessageInfo)}.
+     * dispatch it through {@link #send(LinkedMessageInfo)}.
      *
      * @param chatJid   the recipient chat, group, status, or newsletter
      *                  {@link Jid}
-     * @param container the raw {@link MessageContainer}
+     * @param container the raw {@link LinkedMessageContainer}
      * @return the parsed server {@link AckResult}
      * @throws NullPointerException if any argument is {@code null}
      */
-    AckResult send(Jid chatJid, MessageContainer container);
+    AckResult send(Jid chatJid, LinkedMessageContainer container);
 
     /**
-     * Dispatches a fully-prepared {@link MessageInfo} to its target chat.
+     * Dispatches a fully-prepared {@link LinkedMessageInfo} to its target chat.
      *
      * <p>This overload is for callers that have already prepared the
-     * {@link MessageInfo} (typically a resend, a debug-injection harness, or a
+     * {@link LinkedMessageInfo} (typically a resend, a debug-injection harness, or a
      * follow-up to a {@link #sendKeyDistribution(Jid, MessageKey)} call). The
      * routing predicate keys on the message-info subtype combined with the
      * parent JID's server. A {@link ChatMessageInfo} is accepted for user, group,
@@ -60,10 +60,10 @@ public interface MessageSendingService {
      *
      * @implSpec
      * Implementations must reject a duplicate in-flight send for the same message id and must
-     * resolve the wire path from the {@link MessageInfo} subtype paired with the parent JID's
+     * resolve the wire path from the {@link LinkedMessageInfo} subtype paired with the parent JID's
      * server kind.
      *
-     * @param messageInfo the fully-prepared outgoing {@link MessageInfo}
+     * @param messageInfo the fully-prepared outgoing {@link LinkedMessageInfo}
      * @return the parsed server {@link AckResult}
      * @throws NullPointerException                           if
      *                                                        {@code messageInfo}
@@ -75,13 +75,13 @@ public interface MessageSendingService {
      * @throws WhatsAppMessageException.Send.InvalidRecipient if the parent JID's
      *                                                        server does not
      *                                                        match the
-     *                                                        {@link MessageInfo}
+     *                                                        {@link LinkedMessageInfo}
      *                                                        subtype
      * @throws WhatsAppMessageException.Send.Unknown          if a send is
      *                                                        already in flight
      *                                                        for the same id
      */
-    AckResult send(MessageInfo messageInfo);
+    AckResult send(LinkedMessageInfo messageInfo);
 
     /**
      * Dispatches a standalone sender-key distribution to a group with no message

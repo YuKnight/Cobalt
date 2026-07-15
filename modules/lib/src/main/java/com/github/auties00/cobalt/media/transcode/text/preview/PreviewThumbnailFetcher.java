@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,7 +27,7 @@ import javax.imageio.ImageWriteParam;
  *
  * <p>Fetches an image URL, caps the response size to defend against
  * hostile servers, and re-encodes the bytes as a small JPEG so the
- * result fits the inline-thumbnail slot on {@link com.github.auties00.cobalt.model.message.text.ExtendedTextMessage}.
+ * result fits the inline-thumbnail slot on {@link com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage}.
  *
  * @implNote This implementation resizes via {@link ImageIO} and
  * {@link BufferedImage} when the optional {@code java.desktop} module is

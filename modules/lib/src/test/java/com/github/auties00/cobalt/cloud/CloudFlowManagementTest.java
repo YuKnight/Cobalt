@@ -2,11 +2,11 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowAssetType;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowEndpointAvailability;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowMetadataEditBuilder;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowAssetType;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowEndpointAvailability;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowMetadataEditBuilder;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowStatus;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

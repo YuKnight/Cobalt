@@ -5,13 +5,13 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.business.NoteStateBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.media.NoteEditAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.business.NoteStateBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.NoteEditAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import java.lang.System.Logger.Level;
@@ -104,7 +104,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      * is malformed; an unresolvable chat is
      * {@link MutationApplicationResult#orphan(String, String)}; and the
      * resolved record is persisted via
-     * {@link LinkedWhatsAppBusinessStore#putNoteState(com.github.auties00.cobalt.model.business.NoteState)}
+     * {@link LinkedWhatsAppBusinessStore#putNoteState(com.github.auties00.cobalt.wire.linked.business.NoteState)}
      * keyed by the id from {@link #resolveNoteId(Jid, Jid, String)}. Exceptions
      * surface as {@link MutationApplicationResult#failed()}.
      *

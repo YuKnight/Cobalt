@@ -2,12 +2,12 @@ package com.github.auties00.cobalt.calls.engine.mediaplane;
 
 import com.github.auties00.cobalt.calls.engine.participant.CallMembership;
 import com.github.auties00.cobalt.calls.transport.subscription.StreamLayout;
-import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptionExt;
-import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptions;
-import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptionsSpec;
-import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions;
-import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsSpec;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SenderSubscriptionExt;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SenderSubscriptions;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.SenderSubscriptionsSpec;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptions;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.StreamSubscriptionsSpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

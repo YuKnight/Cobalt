@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.listener.linked.internal;
 
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 /**
  * The internal listener that delivers a peer's reciprocal trusted-contact token to the client.
  *
- * <p>{@link com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient#queryTrustedContactToken(com.github.auties00.cobalt.model.jid.JidProvider)},
+ * <p>{@link com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient#queryTrustedContactToken(com.github.auties00.cobalt.wire.core.jid.JidProvider)},
  * when no token is cached, vouches for a peer and then blocks until the peer's token is pushed back;
  * the privacy-token stream handler stores the delivered token on the peer's chat and then notifies the
  * client's always-registered instance of this listener, which wakes the blocked query so it completes.

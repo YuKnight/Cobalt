@@ -13,37 +13,37 @@ import com.github.auties00.cobalt.message.send.stanza.ChatFanoutStanza;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ParticipantsStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.media.AudioMessage;
-import com.github.auties00.cobalt.model.message.media.DocumentMessage;
-import com.github.auties00.cobalt.model.message.media.ImageMessage;
-import com.github.auties00.cobalt.model.message.media.StickerMessage;
-import com.github.auties00.cobalt.model.message.media.VideoMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.privacy.StatusPrivacySetting;
-import com.github.auties00.cobalt.model.privacy.StatusPrivacyMode;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.media.AudioMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.DocumentMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.StickerMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.VideoMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.privacy.StatusPrivacySetting;
+import com.github.auties00.cobalt.wire.linked.privacy.StatusPrivacyMode;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.PrekeysDepletionEventBuilder;
-import com.github.auties00.cobalt.wam.event.StatusPostEventBuilder;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
-import com.github.auties00.cobalt.wam.type.PrivacySettingsValueType;
-import com.github.auties00.cobalt.wam.type.SizeBucket;
-import com.github.auties00.cobalt.wam.type.StatusCategory;
-import com.github.auties00.cobalt.wam.type.StatusPostOrigin;
-import com.github.auties00.cobalt.wam.type.StatusPostResult;
+import com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.StatusPostEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
+import com.github.auties00.cobalt.wire.wam.type.MessageType;
+import com.github.auties00.cobalt.wire.wam.type.PrekeysFetchContext;
+import com.github.auties00.cobalt.wire.wam.type.PrivacySettingsValueType;
+import com.github.auties00.cobalt.wire.wam.type.SizeBucket;
+import com.github.auties00.cobalt.wire.wam.type.StatusCategory;
+import com.github.auties00.cobalt.wire.wam.type.StatusPostOrigin;
+import com.github.auties00.cobalt.wire.wam.type.StatusPostResult;
 
 import java.lang.System.Logger.Level;
 import java.util.*;
@@ -192,7 +192,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
             skExistingDevices.clear();
         }
 
-        var plaintext = MessageContainerSpec.encode(container);
+        var plaintext = LinkedMessageContainerSpec.encode(container);
         var skmsgPayload = encryption.encryptForGroup(statusJid, selfJid, plaintext);
         var senderKeyBytes = encryption.getSenderKeyBytes(statusJid, selfJid);
 
@@ -369,14 +369,14 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * direct-path flag set so the caller dispatches via
      * {@link #sendDirectRevoke(Jid, ChatMessageInfo, Collection)}.
      *
-     * @param container       the outbound {@link MessageContainer}
+     * @param container       the outbound {@link LinkedMessageContainer}
      * @param currentAudience the resolved status audience fanout
      * @return the {@link RevokeResolution} describing the dispatch decision
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     private RevokeResolution resolveRevokeDevices(
-            MessageContainer container,
+            LinkedMessageContainer container,
             Collection<Jid> currentAudience
     ) {
         if (!(container.content() instanceof ProtocolMessage pm)
@@ -521,7 +521,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     }
 
     /**
-     * Commits one {@link com.github.auties00.cobalt.wam.event.StatusPostEvent}
+     * Commits one {@link com.github.auties00.cobalt.wire.wam.event.StatusPostEvent}
      * recording the outcome and composition of a completed status post.
      *
      * <p>Invoked once the SKMSG status stanza has been dispatched and acked, for
@@ -582,12 +582,12 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * to {@link MediaType#STICKER}, and every other content (text status
      * included) to {@link MediaType#NONE}.
      *
-     * @param container the outbound status {@link MessageContainer}
+     * @param container the outbound status {@link LinkedMessageContainer}
      * @return the matching {@link MediaType}; never {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebLogStatusPost", exports = "getStatusMediaType",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static MediaType resolveWamMediaType(MessageContainer container) {
+    private static MediaType resolveWamMediaType(LinkedMessageContainer container) {
         return switch (container.content()) {
             case ImageMessage _ -> MediaType.PHOTO;
             case VideoMessage _ -> MediaType.VIDEO;
@@ -633,10 +633,10 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * {@link VideoMessage}, {@link DocumentMessage}) can supply a caption; every
      * other content type reports {@code false}.
      *
-     * @param container the outbound status {@link MessageContainer}
+     * @param container the outbound status {@link LinkedMessageContainer}
      * @return {@code true} when the content carries a non-empty caption
      */
-    private static boolean resolveHasCaption(MessageContainer container) {
+    private static boolean resolveHasCaption(LinkedMessageContainer container) {
         return switch (container.content()) {
             case ImageMessage image -> image.caption().isPresent();
             case VideoMessage video -> video.caption().isPresent();
@@ -647,7 +647,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
     /**
      * Commits one
-     * {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
+     * {@link com.github.auties00.cobalt.wire.wam.event.PrekeysDepletionEvent} per
      * depleted one-time pre-key reported by the last
      * {@link DeviceService#ensureSessions(Collection)} call.
      *

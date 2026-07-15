@@ -1,24 +1,25 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.bot.metrics.BotMetricsEntryPoint;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.*;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.event.EventMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollResultSnapshotMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.SecretEncMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.history.MessageHistoryNotice;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.bot.metrics.BotMetricsEntryPoint;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.*;
+import com.github.auties00.cobalt.wire.core.message.*;
+import com.github.auties00.cobalt.wire.linked.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EventMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollResultSnapshotMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.SecretEncMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.history.MessageHistoryNotice;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import java.lang.System.Logger.Level;
@@ -78,18 +79,18 @@ public final class MetaStanza {
      * AI conversation thread id and is non-null only inside an AI thread.
      *
      * @implNote This implementation extracts the thread-message target by scanning {@link ChatMessageContextInfo#threadId()}
-     * for the first non-AI entry. The view-once flag is read from {@link MessageContainer#futureProofContentType()}
+     * for the first non-AI entry. The view-once flag is read from {@link LinkedMessageContainer#futureProofContentType()}
      * rather than a dedicated media flag; the two are semantically equivalent in the wrappers that reach this builder.
      *
      * @param chatJid          the recipient chat {@link Jid}
-     * @param container        the outgoing {@link MessageContainer}
+     * @param container        the outgoing {@link LinkedMessageContainer}
      * @param statusSetting    the status-privacy label, or {@code null} for non-status messages
      * @param hashedAiThreadId the HMAC-hashed AI thread id, or {@code null} when not in an AI thread
      * @return the {@code <meta>} {@link Stanza}, or {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public Stanza buildChat(Jid chatJid, MessageContainer container, String statusSetting, String hashedAiThreadId) {
+    public Stanza buildChat(Jid chatJid, LinkedMessageContainer container, String statusSetting, String hashedAiThreadId) {
         var message = container.content();
 
         var polltype = resolvePollType(message);
@@ -174,17 +175,17 @@ public final class MetaStanza {
     /**
      * Builds the {@code <meta>} child without a pre-computed AI thread id hash.
      * <p>
-     * Delegates to {@link #buildChat(Jid, MessageContainer, String, String)} with {@code null} for the AI thread id, for
+     * Delegates to {@link #buildChat(Jid, LinkedMessageContainer, String, String)} with {@code null} for the AI thread id, for
      * the non-AI-thread send path.
      *
      * @param chatJid       the recipient chat {@link Jid}
-     * @param container     the outgoing {@link MessageContainer}
+     * @param container     the outgoing {@link LinkedMessageContainer}
      * @param statusSetting the status-privacy label, or {@code null}
      * @return the {@code <meta>} {@link Stanza}, or {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public Stanza buildChat(Jid chatJid, MessageContainer container, String statusSetting) {
+    public Stanza buildChat(Jid chatJid, LinkedMessageContainer container, String statusSetting) {
         return buildChat(chatJid, container, statusSetting, null);
     }
 
@@ -355,7 +356,7 @@ public final class MetaStanza {
      * Returns whether the recipient is a hosted business account.
      * <p>
      * Drives the {@code sender_intent="hosted"} attribute. A hosted business has a verified-business-name record whose
-     * {@link com.github.auties00.cobalt.model.business.BusinessVerifiedName#hostStorage()} is present.
+     * {@link com.github.auties00.cobalt.wire.linked.business.BusinessVerifiedName#hostStorage()} is present.
      *
      * @param chatJid the recipient chat {@link Jid}
      * @return {@code true} when the recipient has a hosted-storage record

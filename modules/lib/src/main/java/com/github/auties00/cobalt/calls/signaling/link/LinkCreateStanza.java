@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.calls.signaling.link;
 
-import com.github.auties00.cobalt.model.call.CallLinkCreate;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkCreate;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.time.Instant;
 import java.util.NoSuchElementException;

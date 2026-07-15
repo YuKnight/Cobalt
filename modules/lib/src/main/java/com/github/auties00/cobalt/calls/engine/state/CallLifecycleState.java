@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.engine.state;
 
-import com.github.auties00.cobalt.model.call.CallState;
+import com.github.auties00.cobalt.wire.linked.call.CallState;
 
 import java.util.Optional;
 

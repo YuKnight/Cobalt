@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.audio;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;

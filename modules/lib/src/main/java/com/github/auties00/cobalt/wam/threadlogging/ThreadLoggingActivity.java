@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
 /**
  * A single thread-interaction event reported by a producer hook to
- * {@link ThreadLoggingService#recordActivity(com.github.auties00.cobalt.model.jid.JidProvider, ThreadLoggingActivity)}.
+ * {@link ThreadLoggingService#recordActivity(com.github.auties00.cobalt.wire.core.jid.JidProvider, ThreadLoggingActivity)}.
  *
  * <p>Each variant carries only the classification flags the service needs to decide which counters on
  * the thread's day-bucket row to bump; the service performs the actual increments. The variants mirror

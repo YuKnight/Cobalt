@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
  *       callback interfaces for incoming messages, presence, calls, and other asynchronous notifications.</li>
  *   <li>Session and entity persistence through {@link LinkedWhatsAppStore},
  *       which holds chats, contacts, messages, and the Signal protocol material for a session.</li>
- *   <li>The {@code calls2} packages, which expose voice and video calling together with audio and video
+ *   <li>The {@code calls} packages, which expose voice and video calling together with audio and video
  *       frame sources, sinks, and filters.</li>
  *   <li>The {@code stanza} packages, which expose the stanza model used to build and read IQ, MEX, SMAX,
  *       and USync protocol stanzas.</li>
@@ -89,7 +89,14 @@ module com.github.auties00.cobalt {
     requires org.apache.pdfbox;
 
     // Data model
-    requires com.github.auties00.cobalt.model;
+    requires com.github.auties00.cobalt.wire.linked;
+    requires com.github.auties00.cobalt.wire.cloud;
+    requires transitive com.github.auties00.cobalt.wire.wam;
+    requires transitive com.github.auties00.cobalt.wire.stanza;
+    requires com.github.auties00.cobalt.stanza;
+    requires com.github.auties00.cobalt.telemetry;
+    requires transitive com.github.auties00.cobalt.wire.graphql;
+    requires com.github.auties00.cobalt.wire.push;
 
     // WAM annotation processor and types
     requires com.github.auties00.cobalt.wam;
@@ -121,18 +128,7 @@ module com.github.auties00.cobalt {
     exports com.github.auties00.cobalt.exception.linked.mobile;
     exports com.github.auties00.cobalt.exception.cloud;
 
-    // Stanza queries
-    // Exported so the user can make his own queries
-    exports com.github.auties00.cobalt.stanza;
-    exports com.github.auties00.cobalt.stanza.iq;
-    exports com.github.auties00.cobalt.stanza.mex;
-    exports com.github.auties00.cobalt.stanza.smax;
-    exports com.github.auties00.cobalt.stanza.usync;
 
-    // GraphQL queries
-    // Exported so the user can make his own queries
-    exports com.github.auties00.cobalt.graphql.facebook;
-    exports com.github.auties00.cobalt.graphql.whatsappWeb;
 
     // Store
     // Exported for obvious reasons
@@ -140,10 +136,5 @@ module com.github.auties00.cobalt {
     exports com.github.auties00.cobalt.store.linked;
     exports com.github.auties00.cobalt.store.cloud;
 
-    // Metrics
-    // Export the codegen event specs + types so that users can send their own WAM events through LinkedWhatsAppClient
-    // Don't export the WAM internals
-    exports com.github.auties00.cobalt.wam.event;
-    exports com.github.auties00.cobalt.wam.type;
-    exports com.github.auties00.cobalt.graphql.whatsapp;
+    // The WAM event specs and types are exported by cobalt-wire-wam and reach users transitively.
 }

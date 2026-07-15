@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.store.linked.protobuf.*;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;

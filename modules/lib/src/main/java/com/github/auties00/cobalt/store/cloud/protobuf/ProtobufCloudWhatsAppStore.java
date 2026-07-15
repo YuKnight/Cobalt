@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.store.cloud.protobuf;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.mixin.PathMixin;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.mixin.PathMixin;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.util.BufferedProtobufOutputStream;
 import it.auties.protobuf.annotation.ProtobufMessage;

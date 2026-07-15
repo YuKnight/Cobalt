@@ -3,8 +3,8 @@ package com.github.auties00.cobalt.media;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.media.MediaPath;
-import com.github.auties00.cobalt.model.media.MediaProvider;
+import com.github.auties00.cobalt.wire.linked.media.MediaPath;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
 
 import java.util.*;
 

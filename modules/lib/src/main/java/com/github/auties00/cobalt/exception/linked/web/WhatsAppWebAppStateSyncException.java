@@ -4,8 +4,8 @@ import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.error.DisconnectReason;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.error.DisconnectReason;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 
 import java.util.HexFormat;
 import java.util.List;

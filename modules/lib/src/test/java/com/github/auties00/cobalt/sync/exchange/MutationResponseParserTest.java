@@ -1,15 +1,15 @@
 package com.github.auties00.cobalt.sync.exchange;
 
 import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
-import com.github.auties00.cobalt.model.media.ExternalBlobReferenceBuilder;
-import com.github.auties00.cobalt.model.media.ExternalBlobReferenceSpec;
-import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.data.SyncdPatchBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdPatchSpec;
-import com.github.auties00.cobalt.model.sync.data.SyncdVersionBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReferenceBuilder;
+import com.github.auties00.cobalt.wire.linked.media.ExternalBlobReferenceSpec;
+import com.github.auties00.cobalt.wire.linked.signal.KeyIdBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdPatchBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdPatchSpec;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdVersionBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

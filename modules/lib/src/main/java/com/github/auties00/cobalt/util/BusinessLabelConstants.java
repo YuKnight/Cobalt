@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.util;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.wam.type.CtwaLabelType;
+import com.github.auties00.cobalt.wire.wam.type.CtwaLabelType;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +36,7 @@ public final class BusinessLabelConstants {
      * client uses to paint chat labels.
      *
      * <p>Indexing into this list with a
-     * {@link com.github.auties00.cobalt.model.preference.Label}'s stored palette
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label}'s stored palette
      * slot resolves the same numeric value to the same visual colour the
      * Android client would have painted.
      */
@@ -55,7 +55,7 @@ public final class BusinessLabelConstants {
      * client uses to paint chat labels.
      *
      * <p>Indexing into this list with a
-     * {@link com.github.auties00.cobalt.model.preference.Label}'s stored palette
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label}'s stored palette
      * slot resolves the same numeric value to the same visual colour the iPhone
      * client would have painted.
      */
@@ -73,7 +73,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "New customer" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "New customer" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -85,7 +85,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "New order" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "New order" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -97,7 +97,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "Pending payment" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "Pending payment" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -109,7 +109,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "Paid" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "Paid" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -121,7 +121,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "Order complete" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "Order complete" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -133,7 +133,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "Important" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "Important" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -145,7 +145,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "Follow up" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "Follow up" built-in label.
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelConstants",
@@ -157,7 +157,7 @@ public final class BusinessLabelConstants {
      * The predefined-id integer assigned to the "Lead" label.
      *
      * <p>Matching this value against the {@code predefinedId} on a
-     * {@link com.github.auties00.cobalt.model.preference.Label} synced from the
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} synced from the
      * server identifies the "Lead" built-in label; the customer-manager
      * "apply lead label" automation keys off this identifier.
      */
@@ -366,7 +366,7 @@ public final class BusinessLabelConstants {
      * The maximum number of characters a user may type into a label name.
      *
      * <p>User-entered names are validated against this ceiling before a
-     * {@link com.github.auties00.cobalt.model.preference.Label} is constructed;
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} is constructed;
      * WhatsApp enforces the limit client-side so labels always fit on the
      * chat-list card.
      */
@@ -394,7 +394,7 @@ public final class BusinessLabelConstants {
      *
      * <p>When handling a label-add action from the server, a name matching one
      * of the eight built-ins yields the id to store on the
-     * {@link com.github.auties00.cobalt.model.preference.Label} so subsequent
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label} so subsequent
      * renders pick up the built-in styling. Any custom user-defined name,
      * including {@code null}, returns empty.
      *
@@ -467,7 +467,7 @@ public final class BusinessLabelConstants {
      * identifier.
      *
      * <p>Resolves the label chip text from a server-synced
-     * {@link com.github.auties00.cobalt.model.preference.Label}. The eight
+     * {@link com.github.auties00.cobalt.wire.linked.preference.Label}. The eight
      * primary predefined ids ({@link #PREDEFINED_LABEL_ID_NEW_CUSTOMER} through
      * {@link #PREDEFINED_LABEL_ID_LEAD}) and the two derived Delivery-Order
      * identifiers are accepted; the derived ids fold back onto the corresponding

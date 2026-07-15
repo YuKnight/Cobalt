@@ -5,19 +5,19 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.InteractiveMessageState;
-import com.github.auties00.cobalt.model.chat.InteractiveMessageStateBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction;
-import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction.InteractiveMessageActionMode;
-import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.InteractiveMessageState;
+import com.github.auties00.cobalt.wire.linked.chat.InteractiveMessageStateBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.InteractiveMessageAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.InteractiveMessageAction.InteractiveMessageActionMode;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.InteractiveMessageActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.Collection;
@@ -39,9 +39,9 @@ import java.util.Collection;
  * {@link LinkedWhatsAppBusinessStore#putInteractiveMessageState(InteractiveMessageState)}
  * keyed by {@code agmId|<id>}, {@code messageId|<id>} and the full composite
  * index, resolving the chat directly via
- * {@link LinkedWhatsAppChatStore#findChatByJid(com.github.auties00.cobalt.model.jid.JidProvider)}
+ * {@link LinkedWhatsAppChatStore#findChatByJid(com.github.auties00.cobalt.wire.core.jid.JidProvider)}
  * and the message via
- * {@link LinkedWhatsAppChatStore#findMessageById(com.github.auties00.cobalt.model.chat.Chat, String)}
+ * {@link LinkedWhatsAppChatStore#findMessageById(com.github.auties00.cobalt.wire.linked.chat.Chat, String)}
  * rather than through a batched resolution cache.
  */
 @WhatsAppWebModule(moduleName = "WAWebInteractiveMessageSync")

@@ -38,7 +38,7 @@ class SignalSeamWiringTest {
     @Test
     @DisplayName("no calls class constructs or imports a raw SignalSessionCipher or SignalGroupCipher")
     void noRawCipherConstructionOrImport() {
-        var root = calls2SourceRoot();
+        var root = callsSourceRoot();
         var offenders = new ArrayList<String>();
         try (Stream<Path> files = Files.walk(root)) {
             files.filter(p -> p.toString().endsWith(".java"))
@@ -67,13 +67,13 @@ class SignalSeamWiringTest {
     @Test
     @DisplayName("LiveCallsService holds a MessageService and the crypto facade routes through the message pipeline")
     void callKeyPathWiredThroughMessagePipeline() {
-        var service = read(calls2SourceRoot().resolve("LiveCallsService.java"));
+        var service = read(callsSourceRoot().resolve("LiveCallsService.java"));
         assertTrue(service.contains("import com.github.auties00.cobalt.message.MessageService;"),
                 "LiveCallsService must hold the MessageService that owns offer encryption and key decryption");
         assertTrue(service.contains("private final MessageService messageService;"),
                 "LiveCallsService must keep the MessageService as an injected field");
 
-        var crypto = calls2SourceRoot().resolve("crypto").resolve("LiveCallKeyExchange.java");
+        var crypto = callsSourceRoot().resolve("crypto").resolve("LiveCallKeyExchange.java");
         assertTrue(Files.exists(crypto), "LiveCallKeyExchange.java must exist at " + crypto);
         var cryptoSrc = read(crypto);
         assertTrue(cryptoSrc.contains("messageService.processCall("),
@@ -82,7 +82,7 @@ class SignalSeamWiringTest {
                 "the call-key encrypt path must call MessageEncryption.encryptForDevice");
     }
 
-    private static Path calls2SourceRoot() {
+    private static Path callsSourceRoot() {
         var suffix = Path.of("src", "main", "java", "com", "github", "auties00", "cobalt", "calls");
         var moduleSuffix = Path.of("modules", "lib").resolve(suffix);
         var start = Path.of(System.getProperty("user.dir")).toAbsolutePath();

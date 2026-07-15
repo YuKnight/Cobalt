@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.tos;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.pairing.LinkedPrimaryPlatform;
-import com.github.auties00.cobalt.model.tos.TosNotice;
+import com.github.auties00.cobalt.wire.linked.device.pairing.LinkedPrimaryPlatform;
+import com.github.auties00.cobalt.wire.linked.tos.TosNotice;
 import com.github.auties00.cobalt.props.ABPropsService;
 
 import java.lang.System.Logger.Level;

@@ -12,7 +12,9 @@
     <modules>
         <module>modules/wam-core</module>
         <module>modules/source-meta</module>
-        <module>modules/model</module>
+        <module>modules/wire</module>
+        <module>modules/telemetry-core</module>
+        <module>modules/stanza-core</module>
         <module>modules/lib</module>
     </modules>
 

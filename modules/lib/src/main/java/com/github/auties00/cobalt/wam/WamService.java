@@ -5,11 +5,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.binary.WamGlobalEncoder;
-import com.github.auties00.cobalt.wam.event.WebWamForceFlushEvent;
+import com.github.auties00.cobalt.wire.wam.event.WebWamForceFlushEvent;
 import com.github.auties00.cobalt.wam.model.WamChannel;
 import com.github.auties00.cobalt.wam.model.WamEventSpec;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsUploader;
-import com.github.auties00.cobalt.wam.type.PsIdAction;
+import com.github.auties00.cobalt.wire.wam.type.PsIdAction;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -76,7 +76,7 @@ public interface WamService {
      *
      * <p>This is the entry point used by every internal WAM emitter (the
      * {@code *EventBuilder} classes in the
-     * {@code com.github.auties00.cobalt.wam.event} package) and by embedders
+     * {@code com.github.auties00.cobalt.wire.wam.event} package) and by embedders
      * that mirror WA Web telemetry surfaces. The contract has four
      * post-conditions depending on state:
      * <ul>

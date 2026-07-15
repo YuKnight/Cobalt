@@ -2,20 +2,20 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRange;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
 import com.github.auties00.cobalt.sync.ConflictResolution;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
-import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ArchiveChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.ArchiveChatActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
 import java.lang.System.Logger.Level;
@@ -25,7 +25,7 @@ import java.lang.System.Logger.Level;
  *
  * <p>When a chat is archived or unarchived on another device, the server
  * replays the action here as an {@link ArchiveChatAction} and the per-chat
- * {@link com.github.auties00.cobalt.model.chat.Chat#archived()} flag is
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat#archived()} flag is
  * updated.
  *
  * @implNote
@@ -76,9 +76,9 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      * {@inheritDoc}
      *
      * <p>Reads {@link ArchiveChatAction#archived()} from the mutation value,
-     * locates the target {@link com.github.auties00.cobalt.model.chat.Chat} by
+     * locates the target {@link com.github.auties00.cobalt.wire.linked.chat.Chat} by
      * JID, and writes the archive flag through
-     * {@link com.github.auties00.cobalt.model.chat.Chat#setArchived(Boolean)}.
+     * {@link com.github.auties00.cobalt.wire.linked.chat.Chat#setArchived(Boolean)}.
      * Returns {@link MutationApplicationResult#unsupported()} for non-{@link SyncdOperation#SET}
      * operations, an orphan result keyed by chat JID and model type {@code "Chat"}
      * when the chat is not in the store, malformed results when the index or

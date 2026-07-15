@@ -3,8 +3,9 @@ package com.github.auties00.cobalt.client.cloud;
 import com.github.auties00.cobalt.client.WhatsAppClientBuilder;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 
@@ -89,10 +90,10 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         Objects.requireNonNull(phoneNumberId, "phoneNumberId must not be null");
         var existing = storeFactory.load(phoneNumberId);
         if (existing.isPresent()) {
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resuming persisted connection for phone number {0}", Log.phone(phoneNumberId));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resuming persisted connection for phone number {0}", new LogRedactable.Phone(phoneNumberId));
             return new Options(existing.get().setAccessToken(accessToken));
         }
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating fresh connection for phone number {0}", Log.phone(phoneNumberId));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating fresh connection for phone number {0}", new LogRedactable.Phone(phoneNumberId));
         return new Options(storeFactory.create(accessToken, phoneNumberId));
     }
 
@@ -107,7 +108,7 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
     public Optional<Options> loadConnection(String phoneNumberId) throws IOException {
         Objects.requireNonNull(phoneNumberId, "phoneNumberId must not be null");
         var result = storeFactory.load(phoneNumberId).map(Options::new);
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded connection for phone number {0}: {1}", Log.phone(phoneNumberId), result.isPresent());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded connection for phone number {0}: {1}", new LogRedactable.Phone(phoneNumberId), result.isPresent());
         return result;
     }
 

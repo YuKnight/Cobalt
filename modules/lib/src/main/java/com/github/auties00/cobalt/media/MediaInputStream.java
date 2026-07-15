@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.media;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -31,8 +31,8 @@ import java.util.Objects;
  * initialisation, and SHA-256 hashing. Subclasses drive a streaming state
  * machine; this base contributes only the per-operation factory methods and
  * the raw input wiring. The concrete subclasses are reached through
- * {@link MediaConnectionService#upload(com.github.auties00.cobalt.model.media.MediaProvider, MediaPayload)}
- * and {@link MediaConnectionService#download(com.github.auties00.cobalt.model.media.MediaProvider)}.
+ * {@link MediaConnectionService#upload(com.github.auties00.cobalt.wire.linked.media.MediaProvider, MediaPayload)}
+ * and {@link MediaConnectionService#download(com.github.auties00.cobalt.wire.linked.media.MediaProvider)}.
  */
 @WhatsAppWebModule(moduleName = "WAMediaCrypto")
 abstract class MediaInputStream extends InputStream {

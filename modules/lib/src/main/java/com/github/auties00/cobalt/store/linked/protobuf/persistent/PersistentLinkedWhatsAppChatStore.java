@@ -1,16 +1,16 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMute;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMute;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.store.linked.protobuf.ProtobufLinkedWhatsAppChatStore;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
@@ -151,7 +151,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
     }
 
     @Override
-    public Optional<? extends MessageInfo> findMessageById(JidProvider provider, String id) {
+    public Optional<? extends LinkedMessageInfo> findMessageById(JidProvider provider, String id) {
         if (Log.TRACE) LOGGER.log(Level.TRACE, "looking up message {0} for {1}", id, provider);
         return provider == null || id == null ? Optional.empty() : switch (provider) {
             case Chat chat -> findMessageById(chat, id);
@@ -304,7 +304,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
     }
 
     @Override
-    public Optional<? extends MessageInfo> findMessageByKey(MessageKey key) {
+    public Optional<? extends LinkedMessageInfo> findMessageByKey(MessageKey key) {
         var id = key.id();
         if (id.isEmpty()) {
             return Optional.empty();

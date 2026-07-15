@@ -6,11 +6,11 @@ import com.github.auties00.cobalt.exception.linked.WhatsAppConnectionException;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppServerRuntimeException;
 import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 
 import java.lang.System.Logger.Level;

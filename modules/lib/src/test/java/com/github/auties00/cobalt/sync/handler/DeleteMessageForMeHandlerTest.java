@@ -3,18 +3,18 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeAction;
-import com.github.auties00.cobalt.model.sync.action.chat.DeleteMessageForMeActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.DeleteMessageForMeAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.DeleteMessageForMeActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.DeleteMessageForMeMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Each test runs against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * via {@link TestWhatsAppClient}, so it starts from a clean single-device state.
  * The {@code seedMessage} helper installs a single
- * {@link com.github.auties00.cobalt.model.chat.ChatMessageInfo} keyed on a fixed
+ * {@link com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo} keyed on a fixed
  * {@code MESSAGE_ID} so the orphan and removed paths can be exercised without
  * seeding history.
  */
@@ -74,7 +74,7 @@ class DeleteMessageForMeHandlerTest {
                 .build();
         chat.addMessage(new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.of("hello"))
+                .message(LinkedMessageContainer.of("hello"))
                 .timestamp(Instant.now())
                 .build());
     }

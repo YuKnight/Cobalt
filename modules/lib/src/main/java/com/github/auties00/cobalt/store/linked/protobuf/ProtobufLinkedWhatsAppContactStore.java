@@ -1,19 +1,19 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
-import com.github.auties00.cobalt.model.chat.Chat;
-import com.github.auties00.cobalt.model.contact.Contact;
-import com.github.auties00.cobalt.model.contact.ContactBuilder;
-import com.github.auties00.cobalt.model.contact.ContactTextStatus;
-import com.github.auties00.cobalt.model.contact.OutContact;
-import com.github.auties00.cobalt.model.device.capabilities.DeviceCapabilities;
-import com.github.auties00.cobalt.model.device.capabilities.DeviceCapabilitiesEntry;
-import com.github.auties00.cobalt.model.device.info.DeviceList;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidProvider;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.newsletter.Newsletter;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.business.BusinessVerifiedName;
+import com.github.auties00.cobalt.wire.linked.chat.Chat;
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
+import com.github.auties00.cobalt.wire.linked.contact.ContactBuilder;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatus;
+import com.github.auties00.cobalt.wire.linked.contact.OutContact;
+import com.github.auties00.cobalt.wire.linked.device.capabilities.DeviceCapabilities;
+import com.github.auties00.cobalt.wire.linked.device.capabilities.DeviceCapabilitiesEntry;
+import com.github.auties00.cobalt.wire.linked.device.info.DeviceList;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidProvider;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.newsletter.Newsletter;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
@@ -220,7 +220,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
         return switch (jid) {
             case Contact contact -> Optional.of(contact);
             case null -> Optional.empty();
-            case Chat _, Newsletter _, Jid _, JidServer _ -> {
+            default -> {
                 var targetJid = jid.toJid();
                 if (targetJid.hasUserServer()) {
                     var jidContact = contactsMap.get(targetJid);

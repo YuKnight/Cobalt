@@ -26,12 +26,13 @@ import com.github.auties00.cobalt.calls.signaling.relay.*;
 import com.github.auties00.cobalt.calls.signaling.session.*;
 import com.github.auties00.cobalt.calls.signaling.waitingroom.*;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.*;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
+import com.github.auties00.cobalt.wire.linked.call.*;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -77,7 +78,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
@@ -1508,7 +1509,7 @@ public final class LifecycleController {
                     "Cannot join a call link: the call-link IQ sender is not wired");
         }
 
-        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joining call link token={0}, video={1}", Log.token(token), video);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joining call link token={0}, video={1}", new LogRedactable.Token(token), video);
         // The joiner mints its call object at preview under the all zeros sentinel call id, registers it,
         // runs the link_join handshake, then adopts the relay assigned id and creator from the join ack while
         // the id is still the placeholder. Register under the placeholder, transition to LINK, run the

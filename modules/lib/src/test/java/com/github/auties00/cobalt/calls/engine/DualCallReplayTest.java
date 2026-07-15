@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.calls.engine.context.CallContext.CallRole;
 import com.github.auties00.cobalt.calls.engine.IncomingMessageRouter.DedupState;
 import com.github.auties00.cobalt.calls.engine.IncomingMessageRouter.RoutingClass;
 import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

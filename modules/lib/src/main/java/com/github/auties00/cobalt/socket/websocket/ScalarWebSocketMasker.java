@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket.websocket;
 
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import java.nio.ByteOrder;
 

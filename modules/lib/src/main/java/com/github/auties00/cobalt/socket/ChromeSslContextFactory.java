@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;

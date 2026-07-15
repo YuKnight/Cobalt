@@ -5,12 +5,12 @@ import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.TestWamService;
 import com.github.auties00.cobalt.wam.WamService;
@@ -64,7 +64,7 @@ class MessageReceivingServiceTest {
                 new SignalCryptoLocks());
         var payload = senderEncryption.encryptForDevice(
                 Jid.of("19254863482:0@s.whatsapp.net"),
-                MessageContainerSpec.encode(MessageContainer.of("dispatched via chat")));
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("dispatched via chat")));
 
         var inbound = buildInbound("3EB0RCV0001", SENDER_PRIMARY, "pkmsg", payload.ciphertext());
         var service = new LiveMessageReceivingService(recipientStore, decryption(recipientStore), wamService);
@@ -92,12 +92,12 @@ class MessageReceivingServiceTest {
 
         var firstPayload = senderEncryption.encryptForDevice(
                 Jid.of("19254863482:0@s.whatsapp.net"),
-                MessageContainerSpec.encode(MessageContainer.of("first")));
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("first")));
         var firstInbound = buildInbound("3EB0DEDUP01", SENDER_PRIMARY, "pkmsg", firstPayload.ciphertext());
 
         var secondPayload = senderEncryption.encryptForDevice(
                 Jid.of("19254863482:0@s.whatsapp.net"),
-                MessageContainerSpec.encode(MessageContainer.of("second")));
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("second")));
         var secondInbound = buildInbound("3EB0DEDUP02", SENDER_PRIMARY,
                 secondPayload.type().protocolValue(), secondPayload.ciphertext());
 

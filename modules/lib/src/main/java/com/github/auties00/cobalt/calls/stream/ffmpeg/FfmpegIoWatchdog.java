@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.ffmpeg;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVFormatContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVIOInterruptCB;
 

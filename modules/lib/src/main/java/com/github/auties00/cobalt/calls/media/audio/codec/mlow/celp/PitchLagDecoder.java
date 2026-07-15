@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.celp;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowEntropyWrapper;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeDecoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTables;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.integration;
 
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.sync.WebAppStateBackoffScheduler;
 import org.junit.jupiter.api.AfterEach;

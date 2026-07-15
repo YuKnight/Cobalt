@@ -2,19 +2,20 @@ package com.github.auties00.cobalt.calls.crypto;
 
 import com.github.auties00.cobalt.calls.signaling.session.CallKeyDistribution;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageContainerBuilder;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.model.message.call.CallOfferMessage;
-import com.github.auties00.cobalt.model.message.call.CallOfferMessageBuilder;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.device.identity.ADVSignedDeviceIdentitySpec;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.wire.linked.message.call.CallOfferMessage;
+import com.github.auties00.cobalt.wire.linked.message.call.CallOfferMessageBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import java.lang.System.Logger.Level;
@@ -37,7 +38,7 @@ import java.util.Optional;
  * <ul>
  *   <li><b>mint</b> ({@link #mintCallKey()}): draw thirty two cryptographically strong random bytes.</li>
  *   <li><b>wrap</b> ({@link #wrapCallKey(byte[])}): encode the key as the plaintext
- *       {@code MessageContainer{Call{callKey}}}.</li>
+ *       {@code LinkedMessageContainer{Call{callKey}}}.</li>
  *   <li><b>distribute</b>: encrypt the wrapped plaintext per recipient device through the existing
  *       Signal session cipher, fanned out as a {@link #encryptOfferFanout(Collection, byte[]) per-device
  *       offer block} (1:1) or a {@link #encryptRekeyFanout(Collection, byte[]) per-recipient rekey
@@ -53,7 +54,7 @@ import java.util.Optional;
  * {@code SignalSessionCipher} or {@code SignalGroupCipher} here would bypass that lock and race the
  * non atomic Signal ratchet against concurrent message plane traffic on the same device session, so
  * this service deliberately never does so. The only call plane owned logic is the key minting, the
- * {@code MessageContainer{Call{callKey}}} wrap, the all or nothing bare destination fallback, the
+ * {@code LinkedMessageContainer{Call{callKey}}} wrap, the all or nothing bare destination fallback, the
  * group rekey fanout shape, and the dual inbound {@code <enc>} addressing shapes.
  *
  * <p>Group versus one to one: SFrame, and therefore on the wire rekeys, are GROUP only. A 1:1 call
@@ -61,14 +62,14 @@ import java.util.Optional;
  * arrives post join via {@code <enc_rekey>}) and reshares a fresh key on every membership change, each
  * connected participant fanning its own key unicast to every other participant.
  *
- * @implNote This implementation wraps the raw key as a {@code MessageContainer} whose only populated
+ * @implNote This implementation wraps the raw key as a {@code LinkedMessageContainer} whose only populated
  * payload is a {@link CallOfferMessage} holding the key in its {@code callKey} field; the protobuf
- * encoding is {@code 52 22 0a 20 <32B callKey> ...} ({@code MessageContainer.call} at field 10 wrapping
+ * encoding is {@code 52 22 0a 20 <32B callKey> ...} ({@code LinkedMessageContainer.call} at field 10 wrapping
  * {@code Call.callKey} at field 1). The same single thirty two byte plaintext serves both the 1:1 offer
  * key and the group rekey key; the per direction SRTP, per participant SFrame, and data channel keys are
  * all derived locally after decrypt and never transmitted. The group rekey reshares one key unicast to
  * each other connected participant rather than broadcasting per domain masters. The decrypt path is the
- * exact inverse: Signal decrypt, decode {@code MessageContainer}, read {@code Call.callKey}.
+ * exact inverse: Signal decrypt, decode {@code LinkedMessageContainer}, read {@code Call.callKey}.
  */
 public final class LiveCallKeyExchange implements CallKeyExchange {
     /**
@@ -178,17 +179,17 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
     /**
      * Wraps a raw call key as the plaintext that travels Signal encrypted inside an {@code <enc>}.
      *
-     * <p>The plaintext is a {@link MessageContainer} whose only populated payload is a
+     * <p>The plaintext is a {@link LinkedMessageContainer} whose only populated payload is a
      * {@link CallOfferMessage} carrying the key in its {@code callKey} field. The returned bytes are the
      * protobuf encoding of that container; the caller hands them to a per device Signal encrypt. This is
      * the identical plaintext shape used for both the offer key and the group rekey key.
      *
      * @implNote This implementation produces the byte shape {@code 52 22 0a 20 <32B callKey> ...}: the
-     * protobuf encoding of {@code MessageContainer.call} (field 10) wrapping {@code Call.callKey}
+     * protobuf encoding of {@code LinkedMessageContainer.call} (field 10) wrapping {@code Call.callKey}
      * (field 1, thirty two bytes).
      *
      * @param callKey the raw call key to wrap
-     * @return the protobuf encoded {@code MessageContainer{Call{callKey}}} plaintext
+     * @return the protobuf encoded {@code LinkedMessageContainer{Call{callKey}}} plaintext
      * @throws NullPointerException     if {@code callKey} is {@code null}
      * @throws IllegalArgumentException if {@code callKey} is not {@value #CALL_KEY_LENGTH} bytes long
      */
@@ -202,10 +203,10 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
         var callOffer = new CallOfferMessageBuilder()
                 .callKey(callKey)
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .call(callOffer)
                 .build();
-        return MessageContainerSpec.encode(container);
+        return LinkedMessageContainerSpec.encode(container);
     }
 
     /**
@@ -231,7 +232,7 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
      * per ciphertext {@code msg}/{@code pkmsg} type, and the {@value #ENC_COUNT} retry count.
      *
      * @param deviceJids the peer device JIDs to fan the key out to; never empty in practice
-     * @param plaintext  the wrapped {@code MessageContainer{Call{callKey}}} plaintext from
+     * @param plaintext  the wrapped {@code LinkedMessageContainer{Call{callKey}}} plaintext from
      *                   {@link #wrapCallKey(byte[])}
      * @return one fanout slot per device, all encrypted on success or all bare on any encryption failure
      * @throws NullPointerException if {@code deviceJids} or {@code plaintext} is {@code null}, or if
@@ -262,7 +263,7 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
             } catch (RuntimeException e) {
                 if (Log.WARNING) {
                     LOGGER.log(Level.WARNING,
-                            "call key encryption failed for " + Log.jid(String.valueOf(deviceJid))
+                            "call key encryption failed for " + new LogRedactable.User(String.valueOf(deviceJid))
                                     + "; stripping all <enc> for a bare fanout",
                             e);
                 }
@@ -301,12 +302,12 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
      * @implNote This implementation emits one {@code <enc>} per recipient stanza (NOT a
      * {@code <destination>} block), an {@code <encopt keygen="2"/>} sibling, and a
      * {@code <device identity>} only on {@code pkmsg}. The plaintext is the SAME single thirty two byte
-     * {@code MessageContainer{Call{callKey}}} as the offer key; the per direction keys are derived
+     * {@code LinkedMessageContainer{Call{callKey}}} as the offer key; the per direction keys are derived
      * locally after decrypt, not transmitted. The per device encrypt acquires the
      * {@code SignalCryptoLocks} session lock through {@link MessageEncryption#encryptForDevice(Jid, byte[])}.
      *
      * @param recipientDevices the connected participant devices to reshare the key to
-     * @param plaintext        the wrapped {@code MessageContainer{Call{callKey}}} plaintext from
+     * @param plaintext        the wrapped {@code LinkedMessageContainer{Call{callKey}}} plaintext from
      *                         {@link #wrapCallKey(byte[])} for the freshly minted rekey key
      * @return one rekey envelope per recipient whose encryption succeeded, in input order
      * @throws NullPointerException if {@code recipientDevices} or {@code plaintext} is {@code null}, or
@@ -332,7 +333,7 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
             } catch (RuntimeException e) {
                 if (Log.WARNING) {
                     LOGGER.log(Level.WARNING,
-                            "rekey encryption failed for " + Log.jid(String.valueOf(deviceJid))
+                            "rekey encryption failed for " + new LogRedactable.User(String.valueOf(deviceJid))
                                     + "; skipping this recipient",
                             e);
                 }
@@ -348,15 +349,15 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
      * Decrypts an inbound call key envelope back to the thirty two byte raw call key.
      *
      * <p>Used for both the offer's per device {@code <enc>} and the group {@code <enc_rekey>}'s single
-     * {@code <enc>}: both wrap the same {@code MessageContainer{Call{callKey}}} plaintext. The ciphertext
+     * {@code <enc>}: both wrap the same {@code LinkedMessageContainer{Call{callKey}}} plaintext. The ciphertext
      * is Signal decrypted through {@link MessageService#processCall(Jid, MessageEncryptionType, byte[])}
-     * (which strips the Signal PKCS#7 padding), the plaintext is decoded as a {@link MessageContainer},
+     * (which strips the Signal PKCS#7 padding), the plaintext is decoded as a {@link LinkedMessageContainer},
      * and the key is read from its {@link CallOfferMessage#callKey() callKey}. This method never throws:
      * an empty result means "no end to end key recovered" so the caller can fall back to the hop by hop
      * key.
      *
      * @implNote This implementation decrypts through {@code processCall} under the
-     * {@code SignalCryptoLocks} session lock, decodes the {@link MessageContainer}, and reads
+     * {@code SignalCryptoLocks} session lock, decodes the {@link LinkedMessageContainer}, and reads
      * {@code Call.callKey}. Any decrypt or decode failure is swallowed to an empty result; the engine
      * requires the recovered key to be at most {@value #CALL_KEY_LENGTH} bytes.
      *
@@ -372,7 +373,7 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
         Objects.requireNonNull(ciphertext, "ciphertext cannot be null");
         try {
             var plaintext = messageService.processCall(senderJid, encType, ciphertext);
-            var container = MessageContainerSpec.decode(plaintext);
+            var container = LinkedMessageContainerSpec.decode(plaintext);
             if (container.content() instanceof CallOfferMessage offer) {
                 return offer.callKey();
             }
@@ -380,7 +381,7 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
         } catch (RuntimeException e) {
             if (Log.DEBUG) {
                 LOGGER.log(Level.DEBUG,
-                        "call key decryption from " + Log.jid(String.valueOf(senderJid))
+                        "call key decryption from " + new LogRedactable.User(String.valueOf(senderJid))
                                 + " failed; treating as no end-to-end key",
                         e);
             }

@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.quarantine;
 
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.QuarantinedMessage;
-import com.github.auties00.cobalt.model.privacy.DefenseModePrivacyValue;
-import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
-import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.QuarantinedMessage;
+import com.github.auties00.cobalt.wire.linked.privacy.DefenseModePrivacyValue;
+import com.github.auties00.cobalt.wire.linked.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
 
 /**
  * Classifies inbound messages against WhatsApp's Defense Mode quarantine policy.
@@ -42,12 +42,12 @@ public interface QuarantineService {
      * @param sender  the message sender, or {@code null}
      * @return the quarantine action, never {@code null}
      */
-    QuarantineAction getQuarantineAction(MessageContainer message, Jid sender);
+    QuarantineAction getQuarantineAction(LinkedMessageContainer message, Jid sender);
 
     /**
      * Quarantines an inbound message that Defense Mode classifies as unsolicited.
      *
-     * <p>When {@link #getQuarantineAction(MessageContainer, Jid)} returns a quarantine verdict, the
+     * <p>When {@link #getQuarantineAction(LinkedMessageContainer, Jid)} returns a quarantine verdict, the
      * message's original payload and the extracted replacement text are preserved on the
      * {@link ChatMessageInfo} through
      * {@link ChatMessageInfo#setQuarantinedMessage(QuarantinedMessage)}, its key is recorded for
@@ -55,7 +55,7 @@ public interface QuarantineService {
      * responsible for withholding a quarantined message from the {@code onNewMessage} listeners.
      *
      * @implSpec Implementations quarantine exactly when
-     *           {@link #getQuarantineAction(MessageContainer, Jid)} for the message's content and
+     *           {@link #getQuarantineAction(LinkedMessageContainer, Jid)} for the message's content and
      *           sender returns a quarantine verdict, and return {@code false} without side effects
      *           otherwise.
      * @param info the parsed inbound chat message

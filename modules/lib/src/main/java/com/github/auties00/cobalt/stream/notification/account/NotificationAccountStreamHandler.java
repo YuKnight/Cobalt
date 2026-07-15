@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -14,13 +14,13 @@ import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListene
 import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
-import com.github.auties00.cobalt.model.contact.ContactTextStatus;
-import com.github.auties00.cobalt.model.contact.ContactTextStatusBuilder;
-import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.stanza.usync.UsyncContext;
+import com.github.auties00.cobalt.wire.linked.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatus;
+import com.github.auties00.cobalt.wire.linked.contact.ContactTextStatusBuilder;
+import com.github.auties00.cobalt.wire.linked.device.sync.PendingDeviceSync;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.stanza.usync.UsyncContext;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import java.lang.System.Logger.Level;

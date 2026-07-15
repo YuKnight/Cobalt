@@ -30,15 +30,15 @@ import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.MessageService;
-import com.github.auties00.cobalt.model.call.Call;
-import com.github.auties00.cobalt.model.call.CallEndReason;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.call.Call;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -318,12 +318,12 @@ class InboundRoutingWiringTest {
         }
 
         @Override
-        public AckResult send(Jid chatJid, MessageContainer container) {
+        public AckResult send(Jid chatJid, LinkedMessageContainer container) {
             throw new UnsupportedOperationException("StubMessageService.send not stubbed");
         }
 
         @Override
-        public AckResult send(MessageInfo messageInfo) {
+        public AckResult send(LinkedMessageInfo messageInfo) {
             throw new UnsupportedOperationException("StubMessageService.send not stubbed");
         }
 
@@ -333,7 +333,7 @@ class InboundRoutingWiringTest {
         }
 
         @Override
-        public MessageInfo process(Stanza stanza) {
+        public LinkedMessageInfo process(Stanza stanza) {
             throw new UnsupportedOperationException("StubMessageService.process not stubbed");
         }
 
@@ -429,7 +429,7 @@ class InboundRoutingWiringTest {
                                boolean isCaller, boolean video, int participantCount,
                                com.github.auties00.cobalt.calls.engine.participant.CallMembership membership,
                                com.github.auties00.cobalt.calls.engine.mediaplane.MediaStreams streams,
-                               com.github.auties00.cobalt.model.jid.Jid peerDeviceJid,
+                               com.github.auties00.cobalt.wire.core.jid.Jid peerDeviceJid,
                                Optional<String> electedRelayName,
                                com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener listener) {
             return () -> {

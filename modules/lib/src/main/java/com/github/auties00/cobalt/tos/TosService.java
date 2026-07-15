@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.tos;
 
-import com.github.auties00.cobalt.model.tos.TosNotice;
+import com.github.auties00.cobalt.wire.linked.tos.TosNotice;
 
 import java.util.Collection;
 import java.util.List;

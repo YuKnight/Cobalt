@@ -3,20 +3,20 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.sync.mutation.MutationConflictResolutionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessage;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRangeBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionState;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
-import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadActionBuilder;
-import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationConflictResolutionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessage;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRange;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRangeBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionState;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.MarkChatAsReadAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.MarkChatAsReadActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.PinActionBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.MarkChatAsReadMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,8 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link MarkChatAsReadMutationFactory} builder.
  *
  * <p>The handler runs against an in-memory {@link DeviceFixtures#temporaryStore} via
- * {@link TestWhatsAppClient} so {@link com.github.auties00.cobalt.model.chat.Chat#markedAsUnread()}
- * and {@link com.github.auties00.cobalt.model.chat.Chat#unreadCount()} read-backs can be asserted
+ * {@link TestWhatsAppClient} so {@link com.github.auties00.cobalt.wire.linked.chat.Chat#markedAsUnread()}
+ * and {@link com.github.auties00.cobalt.wire.linked.chat.Chat#unreadCount()} read-backs can be asserted
  * directly.
  */
 @DisplayName("MarkChatAsReadHandler")

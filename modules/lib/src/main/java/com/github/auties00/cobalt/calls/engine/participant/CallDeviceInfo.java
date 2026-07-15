@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
 import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.util.EnumSet;
 import java.util.Objects;

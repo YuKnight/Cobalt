@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.calls.engine;
 
 import com.github.auties00.cobalt.calls.engine.context.CallContext;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
-import com.github.auties00.cobalt.model.call.CallEndReason;
+import com.github.auties00.cobalt.wire.linked.call.CallEndReason;
 
 /**
  * Observes the three end of call outcomes the lifecycle controller reports back to the call service.

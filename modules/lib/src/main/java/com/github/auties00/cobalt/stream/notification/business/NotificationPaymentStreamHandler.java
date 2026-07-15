@@ -1,29 +1,29 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.MessageStatusListener;
 import com.github.auties00.cobalt.listener.NewMessageListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo.StubType;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.payment.OrphanPaymentNotificationBuilder;
-import com.github.auties00.cobalt.model.payment.PaymentInfo;
-import com.github.auties00.cobalt.model.payment.PaymentInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo.StubType;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.linked.payment.OrphanPaymentNotificationBuilder;
+import com.github.auties00.cobalt.wire.linked.payment.PaymentInfo;
+import com.github.auties00.cobalt.wire.linked.payment.PaymentInfoBuilder;
 import com.github.auties00.cobalt.stream.message.PaymentMessageStatus;
 import com.github.auties00.cobalt.stream.message.PaymentMessageTransactionType;
-import com.github.auties00.cobalt.util.RandomIdUtils;
+import com.github.auties00.cobalt.wire.core.util.RandomIdUtils;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -105,7 +105,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
 
     /**
      * Materialises an account-setup invite as a local stub message in the inviter's chat and fires
-     * {@link LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, MessageInfo)} for
+     * {@link LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, LinkedMessageInfo)} for
      * listeners.
      *
      * <p>Only invites whose {@code type} is {@code account-set-up} produce a stub; other invite types are logged and
@@ -155,7 +155,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
                 .status(MessageStatus.DELIVERED)
                 .stubType(StubType.PAYMENT_ACTION_ACCOUNT_SETUP_REMINDER)
                 .stubParameters(List.of(from.toString()))
-                .message(MessageContainer.empty())
+                .message(LinkedMessageContainer.empty())
                 .build();
 
         var chat = whatsapp.store().chatStore().findChatByJid(from)
@@ -233,7 +233,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
     /**
      * Writes transaction fields onto the resolved chat message, propagates the status onto the originating payment
      * request when one exists, and fires
-     * {@link LinkedWhatsAppClientListener#onMessageStatus(LinkedWhatsAppClient, MessageInfo)} for
+     * {@link LinkedWhatsAppClientListener#onMessageStatus(LinkedWhatsAppClient, LinkedMessageInfo)} for
      * listeners.
      *
      * <p>When this transaction fulfils a payment request, the originating request message is located by key and then by
@@ -325,9 +325,9 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
      * @param participant the sender JID in a group, or {@code null} for one-to-one chats
      * @param messageId   the message id to look up
      * @param fromMe      whether the local account is the sender
-     * @return the matching {@link MessageInfo}, or {@code null} when not found
+     * @return the matching {@link LinkedMessageInfo}, or {@code null} when not found
      */
-    private MessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
+    private LinkedMessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
         var direct = whatsapp.store().chatStore().findMessageByKey(new MessageKeyBuilder()
                         .id(messageId)
                         .parentJid(remote)
@@ -340,7 +340,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
         }
 
         return whatsapp.store().chatStore().findMessageById(remote, messageId)
-                .map(MessageInfo.class::cast)
+                .map(LinkedMessageInfo.class::cast)
                 .orElse(null);
     }
 

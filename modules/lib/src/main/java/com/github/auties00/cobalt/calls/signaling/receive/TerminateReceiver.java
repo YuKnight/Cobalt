@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.calls.signaling.receive;
 
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 
 import java.lang.System.Logger.Level;
@@ -35,7 +35,7 @@ import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
  *
  * @implNote This implementation decodes the top level {@code <terminate>} element directly through
  * {@link TerminateStanza#of(Stanza)} rather than unwrapping a {@code <call>} child, and the reason
- * literal resolves to {@link com.github.auties00.cobalt.model.call.CallEndReason} inside that record.
+ * literal resolves to {@link com.github.auties00.cobalt.wire.linked.call.CallEndReason} inside that record.
  * The ordered base's per call chain provides the terminate serialisation on a virtual thread.
  */
 public final class TerminateReceiver extends SocketStreamHandler.Ordered {

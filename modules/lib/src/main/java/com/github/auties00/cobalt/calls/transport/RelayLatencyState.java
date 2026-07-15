@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.calls.transport;
 
 import com.github.auties00.cobalt.calls.signaling.relay.RelayEndpoint;
 import com.github.auties00.cobalt.calls.signaling.relay.RelayLatencyEntry;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;

@@ -6,30 +6,31 @@ import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageContextInfoBuilder;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.*;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.*;
-import com.github.auties00.cobalt.model.message.text.CommentMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageContextInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupMetadata;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.message.*;
+import com.github.auties00.cobalt.wire.core.message.*;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.event.EncEventResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.*;
+import com.github.auties00.cobalt.wire.linked.message.text.CommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.ProtobufValidationErrorEventBuilder;
-import com.github.auties00.cobalt.wam.type.ProtobufValidationFlow;
+import com.github.auties00.cobalt.wire.wam.event.ProtobufValidationErrorEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ProtobufValidationFlow;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -37,8 +38,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Converts a raw {@link MessageContainer} into a fully-populated
- * {@link MessageInfo} ready for dispatch.
+ * Converts a raw {@link LinkedMessageContainer} into a fully-populated
+ * {@link LinkedMessageInfo} ready for dispatch.
  *
  * <p>The preparer generates the wire id and a 32-byte per-message secret,
  * stamps the secret onto both the resulting info and the container's
@@ -131,7 +132,7 @@ final class MessagePreparer {
 
     /**
      * Builds a fully-populated {@link ChatMessageInfo} for the supplied chat
-     * {@link Jid} and {@link MessageContainer}.
+     * {@link Jid} and {@link LinkedMessageContainer}.
      *
      * <p>Generates a {@link MessageIdVersion#V2} wire id, samples a fresh
      * 32-byte {@code messageSecret}, runs the addon validation and
@@ -140,7 +141,7 @@ final class MessagePreparer {
      * is set when the chat is the status broadcast account.
      *
      * @param chatJid   the recipient chat {@link Jid}
-     * @param container the raw {@link MessageContainer}
+     * @param container the raw {@link LinkedMessageContainer}
      * @return the prepared {@link ChatMessageInfo}
      * @throws NullPointerException  if any argument is {@code null}
      * @throws IllegalStateException if the client is not logged in
@@ -151,7 +152,7 @@ final class MessagePreparer {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "getProtobufMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
-    ChatMessageInfo prepareChat(Jid chatJid, MessageContainer container) {
+    ChatMessageInfo prepareChat(Jid chatJid, LinkedMessageContainer container) {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
 
@@ -195,7 +196,7 @@ final class MessagePreparer {
 
     /**
      * Builds a fully-populated {@link NewsletterMessageInfo} for the supplied
-     * newsletter {@link Jid} and {@link MessageContainer}.
+     * newsletter {@link Jid} and {@link LinkedMessageContainer}.
      *
      * <p>Newsletter sends are plaintext SMAX publishes so no
      * {@code messageSecret} is generated and no addon stage runs; the only
@@ -204,7 +205,7 @@ final class MessagePreparer {
      * precondition.
      *
      * @param newsletterJid the newsletter {@link Jid}
-     * @param container     the raw {@link MessageContainer}
+     * @param container     the raw {@link LinkedMessageContainer}
      * @return the prepared {@link NewsletterMessageInfo}
      * @throws NullPointerException     if any argument is {@code null}
      * @throws IllegalStateException    if the client is not logged in
@@ -212,7 +213,7 @@ final class MessagePreparer {
      */
     @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    NewsletterMessageInfo prepareNewsletter(Jid newsletterJid, MessageContainer container) {
+    NewsletterMessageInfo prepareNewsletter(Jid newsletterJid, LinkedMessageContainer container) {
         Objects.requireNonNull(newsletterJid, "newsletterJid");
         Objects.requireNonNull(container, "container");
 
@@ -257,7 +258,7 @@ final class MessagePreparer {
      * {@link SecretEncMessage}) must carry both their {@code encPayload} and
      * {@code encIv}, otherwise the call fails fast.
      *
-     * @param container      the raw {@link MessageContainer}
+     * @param container      the raw {@link LinkedMessageContainer}
      * @param chatJid        the target chat {@link Jid}
      * @param selfJid        the sender's own {@link Jid}
      * @param messageSecret  the per-message secret stamped on the outgoing
@@ -280,8 +281,8 @@ final class MessagePreparer {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebPollsSendVoteMsgAction", exports = "sendVote",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private MessageContainer prepareAddonContent(
-            MessageContainer container,
+    private LinkedMessageContainer prepareAddonContent(
+            LinkedMessageContainer container,
             Jid chatJid,
             Jid selfJid,
             byte[] messageSecret
@@ -320,7 +321,7 @@ final class MessagePreparer {
                     LOGGER.log(Level.DEBUG, "promoting reaction to encrypted addon for {0}", chatJid);
                 }
                 var encrypted = EncMessageFactory.encryptReaction(reaction, parentMessage.get(), selfJid);
-                yield MessageContainer.of(encrypted);
+                yield LinkedMessageContainer.of(encrypted);
             }
 
             case EncReactionMessage enc -> {
@@ -359,7 +360,7 @@ final class MessagePreparer {
                     LOGGER.log(Level.DEBUG, "promoting comment to encrypted addon for {0}", chatJid);
                 }
                 var encrypted = EncMessageFactory.encryptComment(comment, parentMessage.get(), selfJid);
-                yield MessageContainer.of(encrypted);
+                yield LinkedMessageContainer.of(encrypted);
             }
 
             case EncCommentMessage enc -> {
@@ -426,21 +427,21 @@ final class MessagePreparer {
      * {@code ProtobufValidationError} when it does not.
      *
      * <p>WhatsApp stamps the per-message secret onto the top-level
-     * {@link MessageContainer#messageContextInfo()} exclusively; a secret found
+     * {@link LinkedMessageContainer#messageContextInfo()} exclusively; a secret found
      * on any nested submessage is a construction bug that lets the server
      * correlate the ciphertext across chats. When
-     * {@link #findMessageSecretViolation(MessageContainer, int, String)}
+     * {@link #findMessageSecretViolation(LinkedMessageContainer, int, String)}
      * reports such a nested secret, a {@link ProtobufValidationErrorEventBuilder}
      * is committed with {@code protobufValidationFlow} set to
      * {@link ProtobufValidationFlow#STANZA_MESSAGE_SEND} and the offending path;
      * a clean tree emits nothing, mirroring the sender-side branch of WA Web's
      * {@code verifyTopLevelMessageSecret}.
      *
-     * @param message the prepared top-level {@link MessageContainer}
+     * @param message the prepared top-level {@link LinkedMessageContainer}
      */
     @WhatsAppWebExport(moduleName = "WAWebMessageSecretLocationUtils", exports = "verifyTopLevelMessageSecret",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void verifyTopLevelMessageSecret(MessageContainer message) {
+    private void verifyTopLevelMessageSecret(LinkedMessageContainer message) {
         findMessageSecretViolation(message, 0, "")
                 .ifPresent(this::emitProtobufValidationError);
     }
@@ -451,7 +452,7 @@ final class MessagePreparer {
      *
      * <p>The top-level container (depth {@code 0}) is expected to hold the
      * secret and is never flagged; from depth {@code 1} onward any container
-     * whose {@link MessageContainer#messageContextInfo()} exposes a
+     * whose {@link LinkedMessageContainer#messageContextInfo()} exposes a
      * {@link ChatMessageContextInfo#messageSecret()} yields the accumulated
      * dotted {@code path} as the violation location. The walk descends through
      * the quoted-message content reachable from a payload's
@@ -461,7 +462,7 @@ final class MessagePreparer {
      * is skipped exactly as WA Web skips it. Recursion halts at
      * {@link #MESSAGE_SECRET_MAX_DEPTH}.
      *
-     * @param node  the {@link MessageContainer} to inspect at this level
+     * @param node  the {@link LinkedMessageContainer} to inspect at this level
      * @param depth the current nesting depth, {@code 0} at the top level
      * @param path  the dotted field path traversed to reach {@code node}
      * @return the violation path when a nested secret is found, otherwise
@@ -469,7 +470,7 @@ final class MessagePreparer {
      */
     @WhatsAppWebExport(moduleName = "WAWebMessageSecretLocationUtils", exports = "findMessageSecretViolation",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private Optional<String> findMessageSecretViolation(MessageContainer node, int depth, String path) {
+    private Optional<String> findMessageSecretViolation(LinkedMessageContainer node, int depth, String path) {
         if (depth >= MESSAGE_SECRET_MAX_DEPTH) {
             if (Log.WARNING) {
                 LOGGER.log(Level.WARNING, "messageSecret location check exceeded max depth at path {0}", path);

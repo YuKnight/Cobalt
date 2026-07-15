@@ -2,8 +2,8 @@ package com.github.auties00.cobalt.calls.transport;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptions;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RxSubscriptions;
 
 import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;

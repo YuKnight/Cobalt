@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.signaling.session;
 
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 
 import java.util.Optional;
 import com.github.auties00.cobalt.calls.signaling.SignalingType;

@@ -3,12 +3,12 @@ package com.github.auties00.cobalt.wam.threadlogging;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
-import com.github.auties00.cobalt.model.message.commerce.ProductMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.list.ListMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.commerce.OrderMessage;
+import com.github.auties00.cobalt.wire.linked.message.commerce.ProductMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessage;
+import com.github.auties00.cobalt.wire.linked.message.list.ListMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,7 +16,7 @@ import java.util.Optional;
 /**
  * Static helpers classifying a message for the thread-interaction counters.
  *
- * <p>The sole entry point is {@link #isCommerceMessage(MessageContainer)}, used by the send and receive
+ * <p>The sole entry point is {@link #isCommerceMessage(LinkedMessageContainer)}, used by the send and receive
  * producer hooks to decide whether a message bumps the per-thread {@code commerceMsgs} counter on the
  * business thread-interaction event.
  */
@@ -52,7 +52,7 @@ public final class ThreadLoggingMessages {
      * @return {@code true} if the message is a commerce message
      */
     @WhatsAppWebExport(moduleName = "WAWebChatThreadLoggingUtils", exports = "isCommerceMessage", adaptation = WhatsAppAdaptation.DIRECT)
-    public static boolean isCommerceMessage(MessageContainer container) {
+    public static boolean isCommerceMessage(LinkedMessageContainer container) {
         if (isCommerceContent(container)) {
             return true;
         }
@@ -77,7 +77,7 @@ public final class ThreadLoggingMessages {
      * @param container the container whose content is inspected
      * @return {@code true} if the content is a commerce-typed message
      */
-    private static boolean isCommerceContent(MessageContainer container) {
+    private static boolean isCommerceContent(LinkedMessageContainer container) {
         var content = container.content();
         return content instanceof ProductMessage
                 || content instanceof OrderMessage
@@ -95,7 +95,7 @@ public final class ThreadLoggingMessages {
      * @param container the container whose content is inspected
      * @return {@code true} if the message carries an order-details or order-status native flow
      */
-    private static boolean isOrderNativeFlow(MessageContainer container) {
+    private static boolean isOrderNativeFlow(LinkedMessageContainer container) {
         if (!(container.content() instanceof InteractiveMessage interactive)) {
             return false;
         }

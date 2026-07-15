@@ -3,15 +3,16 @@ package com.github.auties00.cobalt.pairing;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
@@ -419,7 +420,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
             cachedRef = ref;
             stage = CompanionPairingStage.AFTER_SEND_COMPANION_HELLO;
 
-            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "companion pairing code generated: {0}", Log.code(pairingCode));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "companion pairing code generated: {0}", new LogRedactable.Code(pairingCode));
 
             if (webVerificationHandler != null) {
                 webVerificationHandler.handle(pairingCode);

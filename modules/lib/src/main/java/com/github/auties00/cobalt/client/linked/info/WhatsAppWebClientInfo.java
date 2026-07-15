@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.client.linked.info;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientAppVersion;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;

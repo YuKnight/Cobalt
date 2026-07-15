@@ -1,9 +1,9 @@
 package com.github.auties00.cobalt.wam;
 
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.event.PsIdUpdateEventBuilder;
-import com.github.auties00.cobalt.wam.event.WamClientErrorsEventBuilder;
-import com.github.auties00.cobalt.wam.type.PsIdAction;
+import com.github.auties00.cobalt.wire.wam.event.PsIdUpdateEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WamClientErrorsEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.PsIdAction;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

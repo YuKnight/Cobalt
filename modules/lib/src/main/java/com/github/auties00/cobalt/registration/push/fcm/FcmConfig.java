@@ -27,7 +27,7 @@ public final class FcmConfig {
      * Configuration impersonating the WhatsApp consumer Android app ({@code com.whatsapp}).
      *
      * <p>Selected by {@link FcmClient#authenticate(LinkedWhatsAppClientDevice)} for
-     * {@link com.github.auties00.cobalt.model.device.pairing.ClientPlatformType#ANDROID}; the values mirror the
+     * {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType#ANDROID}; the values mirror the
      * {@code google-services.json} bundled with the Play Store APK so the FIS and register3 calls look like a real
      * install.
      */
@@ -44,7 +44,7 @@ public final class FcmConfig {
      * Configuration impersonating the WhatsApp Business Android app ({@code com.whatsapp.w4b}).
      *
      * <p>Selected by {@link FcmClient#authenticate(LinkedWhatsAppClientDevice)} for
-     * {@link com.github.auties00.cobalt.model.device.pairing.ClientPlatformType#ANDROID_BUSINESS}; every Firebase
+     * {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType#ANDROID_BUSINESS}; every Firebase
      * resource matches {@link #WHATSAPP_PERSONAL} (same project id, app id, API key, sender id and signing
      * certificate). Only the package name differs.
      */

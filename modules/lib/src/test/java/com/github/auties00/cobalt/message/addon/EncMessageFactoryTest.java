@@ -1,18 +1,18 @@
 package com.github.auties00.cobalt.message.addon;
 
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.poll.PollEncValue;
-import com.github.auties00.cobalt.model.message.text.CommentMessage;
-import com.github.auties00.cobalt.model.message.text.CommentMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
-import com.github.auties00.cobalt.model.message.security.EncCommentMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollEncValue;
+import com.github.auties00.cobalt.wire.linked.message.text.CommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.CommentMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.security.EncCommentMessage;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -124,7 +124,7 @@ class EncMessageFactoryTest {
                 .parentJid(CHAT_JID)
                 .build();
         var comment = new CommentMessageBuilder()
-                .messageContainer(MessageContainer.of("hi"))
+                .messageContainer(LinkedMessageContainer.of("hi"))
                 .targetMessageKey(targetKey)
                 .build();
 
@@ -151,7 +151,7 @@ class EncMessageFactoryTest {
     void encryptCommentMissingSecret() {
         var parent = parent(null, PARENT_KEY_ID, false, OTHER_SENDER);
         var comment = new CommentMessageBuilder()
-                .messageContainer(MessageContainer.of("hi"))
+                .messageContainer(LinkedMessageContainer.of("hi"))
                 .build();
         assertThrows(IllegalArgumentException.class,
                 () -> EncMessageFactory.encryptComment(comment, parent, SELF_JID));
@@ -162,7 +162,7 @@ class EncMessageFactoryTest {
     void encryptCommentKeyIsolation() {
         var parent = parent(PARENT_SECRET, PARENT_KEY_ID, false, OTHER_SENDER);
         var comment = new CommentMessageBuilder()
-                .messageContainer(MessageContainer.of("isolated"))
+                .messageContainer(LinkedMessageContainer.of("isolated"))
                 .build();
         var enc = EncMessageFactory.encryptComment(comment, parent, SELF_JID);
 
@@ -177,7 +177,7 @@ class EncMessageFactoryTest {
     void encryptCommentNullArgs() {
         var parent = parent(PARENT_SECRET, PARENT_KEY_ID, false, OTHER_SENDER);
         var comment = new CommentMessageBuilder()
-                .messageContainer(MessageContainer.of("hi"))
+                .messageContainer(LinkedMessageContainer.of("hi"))
                 .build();
         assertThrows(NullPointerException.class,
                 () -> EncMessageFactory.encryptComment(null, parent, SELF_JID));
@@ -309,7 +309,7 @@ class EncMessageFactoryTest {
                 .build();
         var builder = new ChatMessageInfoBuilder()
                 .key(key)
-                .message(MessageContainer.of("parent body"));
+                .message(LinkedMessageContainer.of("parent body"));
         if (secret != null) {
             builder.messageSecret(secret);
         }

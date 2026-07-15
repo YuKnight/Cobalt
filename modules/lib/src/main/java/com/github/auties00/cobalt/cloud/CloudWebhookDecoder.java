@@ -1,63 +1,53 @@
 package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
-import com.github.auties00.cobalt.model.cloud.CloudAccountUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudAppStateSyncAction;
-import com.github.auties00.cobalt.model.cloud.CloudAppStateSyncContact;
-import com.github.auties00.cobalt.model.cloud.CloudBusinessCapabilityUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudCallDirection;
-import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
-import com.github.auties00.cobalt.model.cloud.CloudCallHours;
-import com.github.auties00.cobalt.model.cloud.CloudCallPermissionResponse;
-import com.github.auties00.cobalt.model.cloud.CloudCallSettings;
-import com.github.auties00.cobalt.model.cloud.CloudCallStatus;
-import com.github.auties00.cobalt.model.cloud.CloudMarketingPreference;
-import com.github.auties00.cobalt.model.cloud.flow.CloudFlowStatusUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudHistorySync;
-import com.github.auties00.cobalt.model.cloud.CloudMessagePricing;
-import com.github.auties00.cobalt.model.cloud.CloudCallSession;
-import com.github.auties00.cobalt.model.cloud.commerce.CloudPaymentConfiguration;
-import com.github.auties00.cobalt.model.cloud.phone.CloudMessagingLimitTier;
-import com.github.auties00.cobalt.model.cloud.phone.CloudPhoneNumberUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudSecurityUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudSystemUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateCategoryUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentsUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplatePauseUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateQualityUpdate;
-import com.github.auties00.cobalt.model.cloud.template.CloudTemplateStatusUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudUserPreferenceUpdate;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
-import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.model.message.commerce.ButtonsResponseMessage;
-import com.github.auties00.cobalt.model.message.commerce.ButtonsResponseMessageBuilder;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessageBuilder;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessageBuilder;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessageBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessageBodyBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessageBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessageNativeFlowResponseMessageBuilder;
-import com.github.auties00.cobalt.model.message.list.ListResponseMessage;
-import com.github.auties00.cobalt.model.message.list.ListResponseMessageBuilder;
-import com.github.auties00.cobalt.model.message.list.ListResponseMessageSingleSelectReplyBuilder;
-import com.github.auties00.cobalt.model.message.location.LocationMessageBuilder;
-import com.github.auties00.cobalt.model.message.media.AudioMessageBuilder;
-import com.github.auties00.cobalt.model.message.media.DocumentMessageBuilder;
-import com.github.auties00.cobalt.model.message.media.ImageMessageBuilder;
-import com.github.auties00.cobalt.model.message.media.StickerMessageBuilder;
-import com.github.auties00.cobalt.model.message.media.VideoMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.cloud.CloudAccountUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudAppStateSyncAction;
+import com.github.auties00.cobalt.wire.cloud.CloudAppStateSyncContact;
+import com.github.auties00.cobalt.wire.cloud.CloudBusinessCapabilityUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudCallDirection;
+import com.github.auties00.cobalt.wire.cloud.CloudCallEvent;
+import com.github.auties00.cobalt.wire.cloud.CloudCallHours;
+import com.github.auties00.cobalt.wire.cloud.CloudCallPermissionResponse;
+import com.github.auties00.cobalt.wire.cloud.CloudCallSettings;
+import com.github.auties00.cobalt.wire.cloud.CloudCallStatus;
+import com.github.auties00.cobalt.wire.cloud.CloudMarketingPreference;
+import com.github.auties00.cobalt.wire.cloud.flow.CloudFlowStatusUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudHistorySync;
+import com.github.auties00.cobalt.wire.cloud.CloudMessagePricing;
+import com.github.auties00.cobalt.wire.cloud.CloudCallSession;
+import com.github.auties00.cobalt.wire.cloud.commerce.CloudPaymentConfiguration;
+import com.github.auties00.cobalt.wire.cloud.phone.CloudMessagingLimitTier;
+import com.github.auties00.cobalt.wire.cloud.phone.CloudPhoneNumberUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudSecurityUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudSystemUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateCategoryUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateComponentsUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplatePauseUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateQualityUpdate;
+import com.github.auties00.cobalt.wire.cloud.template.CloudTemplateStatusUpdate;
+import com.github.auties00.cobalt.wire.cloud.CloudUserPreferenceUpdate;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.core.message.MessageStatus;
+import com.github.auties00.cobalt.wire.core.message.MessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MediaType;
+import com.github.auties00.cobalt.wire.core.message.ContactContent;
+import com.github.auties00.cobalt.wire.cloud.CloudMessageContainer;
+import com.github.auties00.cobalt.wire.cloud.CloudMessageInfo;
+import com.github.auties00.cobalt.wire.cloud.content.CloudTextContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudMediaContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudLocationContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudReactionContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudContactContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudContactsArrayContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudButtonsResponseContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudListResponseContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudInteractiveResponseContent;
+import com.github.auties00.cobalt.wire.cloud.content.CloudOrderContent;
 
 import java.lang.System.Logger.Level;
 import java.time.Instant;
@@ -72,12 +62,12 @@ import java.util.Map;
  *
  * <p>The decoder is the inverse of {@link CloudMessageEncoder}: it reads the {@code messages[]},
  * {@code statuses[]}, and {@code contacts[]} arrays of a webhook change {@code value} and produces
- * {@link ChatMessageInfo} instances for inbound messages and {@link StatusUpdate} records for outbound
+ * {@code ChatMessageInfo} instances for inbound messages and {@link StatusUpdate} records for outbound
  * delivery receipts, mapping the Cloud status strings onto the shared {@link MessageStatus} model.
  * Inbound media is referenced by its Cloud media id, stored in the media message's
  * url field so a later download resolves it through the media edge. Beyond text, media, location,
  * reaction and reply types it also decodes native-flow replies ({@code nfm_reply}), shared contact
- * cards and catalog orders; genuinely unmapped types fall back to {@link MessageContainer#empty()}.
+ * cards and catalog orders; genuinely unmapped types fall back to {@code LinkedMessageContainer#empty()}.
  */
 public final class CloudWebhookDecoder {
     /**
@@ -101,7 +91,7 @@ public final class CloudWebhookDecoder {
      * @param pricing the billing information carried by the entry, or {@code null} when the entry had
      *                no {@code pricing} object
      */
-    public record StatusUpdate(ChatMessageInfo info, boolean deleted, CloudMessagePricing pricing) {
+    public record StatusUpdate(MessageInfo info, boolean deleted, CloudMessagePricing pricing) {
     }
 
     /**
@@ -110,7 +100,7 @@ public final class CloudWebhookDecoder {
      * @param value the webhook change {@code value}
      * @return the decoded inbound messages, empty when the change carried none
      */
-    public static List<ChatMessageInfo> decodeMessages(JSONObject value) {
+    public static List<MessageInfo> decodeMessages(JSONObject value) {
         return decodeMessageArray(value, "messages");
     }
 
@@ -125,7 +115,7 @@ public final class CloudWebhookDecoder {
      * @param value the webhook change {@code value}
      * @return the decoded echoed messages, empty when the change carried none
      */
-    public static List<ChatMessageInfo> decodeMessageEchoes(JSONObject value) {
+    public static List<MessageInfo> decodeMessageEchoes(JSONObject value) {
         return decodeMessageArray(value, "message_echoes");
     }
 
@@ -137,13 +127,13 @@ public final class CloudWebhookDecoder {
      *                 {@code message_echoes} for business message echoes
      * @return the decoded messages, empty when the array was absent or empty
      */
-    private static List<ChatMessageInfo> decodeMessageArray(JSONObject value, String arrayKey) {
+    private static List<MessageInfo> decodeMessageArray(JSONObject value, String arrayKey) {
         var messages = value.getJSONArray(arrayKey);
         if (messages == null || messages.isEmpty()) {
             return List.of();
         }
         var pushNames = pushNamesByWaId(value);
-        var result = new ArrayList<ChatMessageInfo>();
+        var result = new ArrayList<MessageInfo>();
         for (var index = 0; index < messages.size(); index++) {
             var message = messages.getJSONObject(index);
             if (isCallPermissionReply(message)) {
@@ -194,17 +184,10 @@ public final class CloudWebhookDecoder {
                     .build();
             var statusValue = status.getString("status");
             var deleted = "deleted".equalsIgnoreCase(statusValue);
-            var builder = new ChatMessageInfoBuilder()
-                    .key(key)
-                    .message(MessageContainer.empty());
-            if (!deleted) {
-                builder.status(toMessageStatus(statusValue));
-            }
-            var timestamp = status.getLong("timestamp");
-            if (timestamp != null) {
-                builder.timestamp(Instant.ofEpochSecond(timestamp));
-            }
-            result.add(new StatusUpdate(builder.build(), deleted, decodeStatusPricing(status)));
+            var timestampValue = status.getLong("timestamp");
+            var timestamp = timestampValue == null ? null : Instant.ofEpochSecond(timestampValue);
+            var info = new CloudMessageInfo(key, CloudMessageContainer.empty(), deleted ? null : toMessageStatus(statusValue), timestamp, null, null);
+            result.add(new StatusUpdate(info, deleted, decodeStatusPricing(status)));
         }
         return result;
     }
@@ -550,7 +533,7 @@ public final class CloudWebhookDecoder {
                 chunkOrder = chunkOrderValue == null ? -1 : chunkOrderValue;
                 progress = progressValue == null ? -1 : progressValue;
             }
-            var messages = new ArrayList<ChatMessageInfo>();
+            var messages = new ArrayList<MessageInfo>();
             var threads = chunk.getJSONArray("threads");
             if (threads != null) {
                 for (var threadIndex = 0; threadIndex < threads.size(); threadIndex++) {
@@ -988,7 +971,7 @@ public final class CloudWebhookDecoder {
     }
 
     /**
-     * Decodes a single inbound message into a {@link ChatMessageInfo}.
+     * Decodes a single inbound message into a {@code ChatMessageInfo}.
      *
      * <p>When the consumer hides their number, the phone-scoped {@code from} is omitted and only the
      * business-scoped user id ({@code from_user_id}, the BSUID) is present; in that case the BSUID is
@@ -999,7 +982,7 @@ public final class CloudWebhookDecoder {
      * @param pushNames the profile names indexed by sender wa_id, falling back to the BSUID key
      * @return the decoded message
      */
-    private static ChatMessageInfo decodeMessage(JSONObject message, Map<String, String> pushNames) {
+    private static CloudMessageInfo decodeMessage(JSONObject message, Map<String, String> pushNames) {
         var from = message.getString("from");
         var fromUserId = message.getString("from_user_id");
         var identity = from != null ? from : fromUserId;
@@ -1011,62 +994,29 @@ public final class CloudWebhookDecoder {
             keyBuilder.parentJid(senderJid);
         }
         var container = decodeContent(message);
-        var builder = new ChatMessageInfoBuilder()
-                .key(keyBuilder.build())
-                .message(container)
-                .status(MessageStatus.DELIVERED);
-        if (senderJid != null) {
-            builder.senderJid(senderJid);
-        }
-        var timestamp = message.getLong("timestamp");
-        if (timestamp != null) {
-            builder.timestamp(Instant.ofEpochSecond(timestamp));
-        }
-        var pushName = pushNames.get(identity);
-        if (pushName != null) {
-            builder.pushName(pushName);
-        }
-        return builder.build();
+        var timestampValue = message.getLong("timestamp");
+        var timestamp = timestampValue == null ? null : Instant.ofEpochSecond(timestampValue);
+        return new CloudMessageInfo(keyBuilder.build(), container, MessageStatus.DELIVERED, timestamp, senderJid, pushNames.get(identity));
     }
 
     /**
-     * Decodes the content of an inbound message into a {@link MessageContainer}.
+     * Decodes the content of an inbound message into a {@code LinkedMessageContainer}.
      *
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeContent(JSONObject message) {
+    private static CloudMessageContainer decodeContent(JSONObject message) {
         var type = message.getString("type");
         if (type == null) {
-            return MessageContainer.empty();
+            return CloudMessageContainer.empty();
         }
         return switch (type) {
-            case "text" -> MessageContainer.of(new ExtendedTextMessageBuilder()
-                    .text(textBody(message))
-                    .build());
-            case "image" -> MessageContainer.of(new ImageMessageBuilder()
-                    .mediaUrl(mediaId(message, "image"))
-                    .mimetype(mediaMime(message, "image"))
-                    .caption(mediaCaption(message, "image"))
-                    .build());
-            case "video" -> MessageContainer.of(new VideoMessageBuilder()
-                    .mediaUrl(mediaId(message, "video"))
-                    .mimetype(mediaMime(message, "video"))
-                    .caption(mediaCaption(message, "video"))
-                    .build());
-            case "audio" -> MessageContainer.of(new AudioMessageBuilder()
-                    .mediaUrl(mediaId(message, "audio"))
-                    .mimetype(mediaMime(message, "audio"))
-                    .build());
-            case "document" -> MessageContainer.of(new DocumentMessageBuilder()
-                    .mediaUrl(mediaId(message, "document"))
-                    .mimetype(mediaMime(message, "document"))
-                    .caption(mediaCaption(message, "document"))
-                    .build());
-            case "sticker" -> MessageContainer.of(new StickerMessageBuilder()
-                    .mediaUrl(mediaId(message, "sticker"))
-                    .mimetype(mediaMime(message, "sticker"))
-                    .build());
+            case "text" -> CloudMessageContainer.of(new CloudTextContent(textBody(message)));
+            case "image" -> CloudMessageContainer.of(media(MediaType.IMAGE, message, "image", true));
+            case "video" -> CloudMessageContainer.of(media(MediaType.VIDEO, message, "video", true));
+            case "audio" -> CloudMessageContainer.of(media(MediaType.AUDIO, message, "audio", false));
+            case "document" -> CloudMessageContainer.of(media(MediaType.DOCUMENT, message, "document", true));
+            case "sticker" -> CloudMessageContainer.of(media(MediaType.STICKER, message, "sticker", false));
             case "location" -> decodeLocation(message);
             case "reaction" -> decodeReaction(message);
             case "interactive" -> decodeInteractiveReply(message);
@@ -1078,9 +1028,25 @@ public final class CloudWebhookDecoder {
             //       missing content decode (and its mapped type below) when the type is modelled.
             default -> {
                 if (Log.WARNING) LOGGER.log(Level.WARNING, "unmapped inbound content type {0}", type);
-                yield MessageContainer.empty();
+                yield CloudMessageContainer.empty();
             }
         };
+    }
+
+    /**
+     * Builds a Cloud media content body from an inbound media message.
+     *
+     * @param mediaType   the kind of media
+     * @param message     the inbound message object
+     * @param key         the media type key (for example {@code "image"})
+     * @param withCaption whether this media kind carries a caption
+     * @return the decoded media content
+     */
+    private static CloudMediaContent media(MediaType mediaType, JSONObject message, String key, boolean withCaption) {
+        return new CloudMediaContent(mediaType,
+                mediaId(message, key),
+                mediaMime(message, key),
+                withCaption ? mediaCaption(message, key) : null);
     }
 
     /**
@@ -1110,22 +1076,16 @@ public final class CloudWebhookDecoder {
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeLocation(JSONObject message) {
+    private static CloudMessageContainer decodeLocation(JSONObject message) {
         var location = message.getJSONObject("location");
-        var builder = new LocationMessageBuilder();
-        if (location != null) {
-            var latitude = location.getDouble("latitude");
-            var longitude = location.getDouble("longitude");
-            if (latitude != null) {
-                builder.degreesLatitude(latitude);
-            }
-            if (longitude != null) {
-                builder.degreesLongitude(longitude);
-            }
-            builder.name(location.getString("name"));
-            builder.address(location.getString("address"));
+        if (location == null) {
+            return CloudMessageContainer.of(new CloudLocationContent(null, null, null, null));
         }
-        return MessageContainer.of(builder.build());
+        return CloudMessageContainer.of(new CloudLocationContent(
+                location.getDouble("latitude"),
+                location.getDouble("longitude"),
+                location.getString("name"),
+                location.getString("address")));
     }
 
     /**
@@ -1134,17 +1094,14 @@ public final class CloudWebhookDecoder {
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeReaction(JSONObject message) {
+    private static CloudMessageContainer decodeReaction(JSONObject message) {
         var reaction = message.getJSONObject("reaction");
-        var builder = new ReactionMessageBuilder();
-        if (reaction != null) {
-            builder.text(reaction.getString("emoji"));
-            var targetId = reaction.getString("message_id");
-            if (targetId != null) {
-                builder.key(new MessageKeyBuilder().id(targetId).fromMe(true).build());
-            }
+        if (reaction == null) {
+            return CloudMessageContainer.of(new CloudReactionContent(null, null));
         }
-        return MessageContainer.of(builder.build());
+        return CloudMessageContainer.of(new CloudReactionContent(
+                reaction.getString("message_id"),
+                reaction.getString("emoji")));
     }
 
     /**
@@ -1165,66 +1122,49 @@ public final class CloudWebhookDecoder {
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeInteractiveReply(JSONObject message) {
+    private static CloudMessageContainer decodeInteractiveReply(JSONObject message) {
         var interactive = message.getJSONObject("interactive");
         if (interactive != null) {
             var buttonReply = interactive.getJSONObject("button_reply");
             if (buttonReply != null) {
-                return MessageContainer.of(new ButtonsResponseMessageBuilder()
-                        .selectedButtonId(buttonReply.getString("id"))
-                        .selectedDisplayText(buttonReply.getString("title"))
-                        .type(ButtonsResponseMessage.Type.DISPLAY_TEXT)
-                        .build());
+                return CloudMessageContainer.of(new CloudButtonsResponseContent(
+                        buttonReply.getString("id"),
+                        buttonReply.getString("title")));
             }
             var listReply = interactive.getJSONObject("list_reply");
             if (listReply != null) {
-                var reply = new ListResponseMessageSingleSelectReplyBuilder()
-                        .selectedRowId(listReply.getString("id"))
-                        .build();
-                return MessageContainer.of(new ListResponseMessageBuilder()
-                        .title(listReply.getString("title"))
-                        .description(listReply.getString("description"))
-                        .singleSelectReply(reply)
-                        .listType(ListResponseMessage.ListType.SINGLE_SELECT)
-                        .build());
+                return CloudMessageContainer.of(new CloudListResponseContent(
+                        listReply.getString("title"),
+                        listReply.getString("description"),
+                        listReply.getString("id")));
             }
             var nfmReply = interactive.getJSONObject("nfm_reply");
             if (nfmReply != null) {
-                var flow = new InteractiveResponseMessageNativeFlowResponseMessageBuilder()
-                        .name(nfmReply.getString("name"))
-                        .paramsJson(nfmReply.getString("response_json"))
-                        .build();
-                var responseBuilder = new InteractiveResponseMessageBuilder()
-                        .nativeFlowResponseMessage(flow);
-                var summary = nfmReply.getString("body");
-                if (summary != null) {
-                    responseBuilder.body(new InteractiveResponseMessageBodyBuilder()
-                            .text(summary)
-                            .format(InteractiveResponseMessage.Body.TemplateFormat.DEFAULT)
-                            .build());
-                }
-                return MessageContainer.of(responseBuilder.build());
+                return CloudMessageContainer.of(new CloudInteractiveResponseContent(
+                        nfmReply.getString("name"),
+                        nfmReply.getString("response_json"),
+                        nfmReply.getString("body")));
             }
         }
-        return MessageContainer.empty();
+        return CloudMessageContainer.empty();
     }
 
     /**
      * Decodes an inbound contacts message into a contacts-array message.
      *
-     * <p>Each structured Cloud contact is rebuilt into a vCard-backed {@link ContactMessage}, the
+     * <p>Each structured Cloud contact is rebuilt into a vCard-backed {@code ContactMessage}, the
      * inverse of {@link CloudMessageEncoder} contact encoding. The array display name is the
      * comma-joined formatted names of the contained contacts.
      *
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeContacts(JSONObject message) {
+    private static CloudMessageContainer decodeContacts(JSONObject message) {
         var contacts = message.getJSONArray("contacts");
         if (contacts == null || contacts.isEmpty()) {
-            return MessageContainer.empty();
+            return CloudMessageContainer.empty();
         }
-        var entries = new ArrayList<ContactMessage>();
+        var entries = new ArrayList<ContactContent>();
         var displayNames = new ArrayList<String>();
         for (var index = 0; index < contacts.size(); index++) {
             var contact = contacts.getJSONObject(index);
@@ -1233,15 +1173,9 @@ public final class CloudWebhookDecoder {
             if (formatted != null) {
                 displayNames.add(formatted);
             }
-            entries.add(new ContactMessageBuilder()
-                    .displayName(formatted)
-                    .vcard(vcardFromCloudContact(contact, formatted))
-                    .build());
+            entries.add(new CloudContactContent(formatted, vcardFromCloudContact(contact, formatted)));
         }
-        return MessageContainer.of(new ContactsArrayMessageBuilder()
-                .displayName(String.join(", ", displayNames))
-                .contacts(entries)
-                .build());
+        return CloudMessageContainer.of(new CloudContactsArrayContent(String.join(", ", displayNames), entries));
     }
 
     /**
@@ -1294,25 +1228,25 @@ public final class CloudWebhookDecoder {
      * Decodes an inbound catalog order message into an order message.
      *
      * <p>The mapping is partial: the order note, item count, currency and a derived total survive,
-     * while the catalog id and per-line item details have no field on {@link OrderMessage} and are
-     * dropped. The status defaults to {@link OrderMessage.OrderStatus#INQUIRY} and the surface to
-     * {@link OrderMessage.OrderSurface#CATALOG}.
+     * while the catalog id and per-line item details have no field on {@code OrderMessage} and are
+     * dropped. The status defaults to {@code OrderMessage.OrderStatus#INQUIRY} and the surface to
+     * {@code OrderMessage.OrderSurface#CATALOG}.
      *
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeOrder(JSONObject message) {
+    private static CloudMessageContainer decodeOrder(JSONObject message) {
         var order = message.getJSONObject("order");
-        var builder = new OrderMessageBuilder()
-                .status(OrderMessage.OrderStatus.INQUIRY)
-                .surface(OrderMessage.OrderSurface.CATALOG);
+        String orderMessage = null;
+        Integer itemCount = null;
+        Long total1000 = null;
+        String currency = null;
         if (order != null) {
-            builder.message(order.getString("text"));
+            orderMessage = order.getString("text");
             var items = order.getJSONArray("product_items");
             if (items != null) {
-                builder.itemCount(items.size());
-                long total1000 = 0;
-                String currency = null;
+                itemCount = items.size();
+                long sum = 0;
                 for (var index = 0; index < items.size(); index++) {
                     var item = items.getJSONObject(index);
                     var price = item.getDouble("item_price");
@@ -1320,26 +1254,24 @@ public final class CloudWebhookDecoder {
                     if (price != null) {
                         // TODO: unverified - item_price is in major currency units; the *1000 scaling to
                         //       the thousandths contract could not be confirmed against a Meta source.
-                        total1000 += Math.round(price * (quantity == null ? 1 : quantity) * 1000);
+                        sum += Math.round(price * (quantity == null ? 1 : quantity) * 1000);
                     }
                     if (currency == null) {
                         currency = item.getString("currency");
                     }
                 }
-                builder.totalAmount1000(total1000);
-                builder.totalCurrencyCode(currency);
+                total1000 = sum;
             }
-            // TODO: order.catalog_id and per-item product_retailer_id/quantity/item_price have no
-            //       OrderMessage field; a Cloud-only order model would be needed to carry them.
+            // TODO: order.catalog_id and per-item product_retailer_id/quantity have no field on the
+            //       shared OrderContent contract; a Cloud-specific order model would be needed to carry them.
         }
+        String sourceId = null;
         var context = message.getJSONObject("context");
         if (context != null) {
-            var sourceId = context.getString("id");
-            if (sourceId != null) {
-                builder.orderRequestMessageId(new MessageKeyBuilder().id(sourceId).fromMe(true).build());
-            }
+            sourceId = context.getString("id");
         }
-        return MessageContainer.of(builder.build());
+        return CloudMessageContainer.of(new CloudOrderContent(
+                orderMessage, itemCount, total1000, currency, sourceId));
     }
 
     /**
@@ -1348,15 +1280,14 @@ public final class CloudWebhookDecoder {
      * @param message the inbound message object
      * @return the decoded container
      */
-    private static MessageContainer decodeButtonReply(JSONObject message) {
-        var builder = new ButtonsResponseMessageBuilder()
-                .type(ButtonsResponseMessage.Type.DISPLAY_TEXT);
+    private static CloudMessageContainer decodeButtonReply(JSONObject message) {
         var button = message.getJSONObject("button");
-        if (button != null) {
-            builder.selectedButtonId(button.getString("payload"))
-                    .selectedDisplayText(button.getString("text"));
+        if (button == null) {
+            return CloudMessageContainer.of(new CloudButtonsResponseContent(null, null));
         }
-        return MessageContainer.of(builder.build());
+        return CloudMessageContainer.of(new CloudButtonsResponseContent(
+                button.getString("payload"),
+                button.getString("text")));
     }
 
     /**

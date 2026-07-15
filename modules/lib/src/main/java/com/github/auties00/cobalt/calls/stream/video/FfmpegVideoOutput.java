@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.video;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVChannelLayout;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecParameters;
 import com.github.auties00.cobalt.util.ffmpeg.AVFormatContext;

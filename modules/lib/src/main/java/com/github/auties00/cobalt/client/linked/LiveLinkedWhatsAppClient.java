@@ -31,39 +31,43 @@ import com.github.auties00.cobalt.export.LiveChatExporterService;
 import com.github.auties00.cobalt.graphql.FacebookGraphQlClient;
 import com.github.auties00.cobalt.graphql.WhatsAppGraphQlClient;
 import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlClient;
-import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
-import com.github.auties00.cobalt.graphql.whatsappWeb.auth.*;
-import com.github.auties00.cobalt.graphql.whatsappWeb.business.*;
-import com.github.auties00.cobalt.graphql.whatsappWeb.misc.*;
-import com.github.auties00.cobalt.graphql.whatsappWeb.promotion.*;
-import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
-import com.github.auties00.cobalt.graphql.facebook.ads.*;
-import com.github.auties00.cobalt.graphql.facebook.auth.*;
-import com.github.auties00.cobalt.graphql.facebook.business.*;
-import com.github.auties00.cobalt.graphql.facebook.promotion.*;
-import com.github.auties00.cobalt.graphql.whatsapp.ads.*;
-import com.github.auties00.cobalt.graphql.whatsapp.auth.*;
-import com.github.auties00.cobalt.graphql.whatsapp.business.*;
-import com.github.auties00.cobalt.graphql.whatsapp.misc.*;
-import com.github.auties00.cobalt.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlRequest;
-import com.github.auties00.cobalt.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlResponse;
-import com.github.auties00.cobalt.graphql.facebook.misc.*;
-import com.github.auties00.cobalt.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
-import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderConfigWhatsAppWebGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderConfigWhatsAppWebGraphQlResponse;
-import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderIssuanceWhatsAppWebGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderIssuanceWhatsAppWebGraphQlResponse;
-import com.github.auties00.cobalt.graphql.whatsappWeb.group.GroupSuspensionAppealWhatsAppWebGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsappWeb.group.GroupSuspensionAppealWhatsAppWebGraphQlResponse;
-import com.github.auties00.cobalt.graphql.whatsappWeb.user.FetchBotProfilesGqlWhatsAppWebGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsappWeb.user.FetchBotProfilesGqlWhatsAppWebGraphQlResponse;
-import com.github.auties00.cobalt.graphql.whatsappWeb.user.SupportContactFormSubmitWhatsAppWebGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsappWeb.user.SupportContactFormSubmitWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlBootstrapClient;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlCanonicalCredentials;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlCachedTokenKeyPair;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlCachedTokenDecryptor;
+import com.github.auties00.cobalt.wire.graphql.facebook.FacebookGraphQlOperation;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.auth.*;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.business.*;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.misc.*;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.promotion.*;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.wire.graphql.facebook.ads.*;
+import com.github.auties00.cobalt.wire.graphql.facebook.auth.*;
+import com.github.auties00.cobalt.wire.graphql.facebook.business.*;
+import com.github.auties00.cobalt.wire.graphql.facebook.promotion.*;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.ads.*;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.auth.*;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.business.*;
+import com.github.auties00.cobalt.wire.graphql.whatsapp.misc.*;
+import com.github.auties00.cobalt.wire.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlRequest;
+import com.github.auties00.cobalt.wire.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlResponse;
+import com.github.auties00.cobalt.wire.graphql.facebook.misc.*;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.acs.AcsServerProviderConfigWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.acs.AcsServerProviderConfigWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.acs.AcsServerProviderIssuanceWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.acs.AcsServerProviderIssuanceWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.group.GroupSuspensionAppealWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.group.GroupSuspensionAppealWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.user.FetchBotProfilesGqlWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.user.FetchBotProfilesGqlWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.user.SupportContactFormSubmitWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.wire.graphql.whatsappWeb.user.SupportContactFormSubmitWhatsAppWebGraphQlResponse;
 import com.github.auties00.cobalt.listener.*;
 import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.listener.linked.internal.InternalLinkedListener;
 import com.github.auties00.cobalt.listener.linked.internal.LinkedTrustedContactTokenListener;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.LiveMediaConnectionService;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
@@ -83,136 +87,137 @@ import com.github.auties00.cobalt.migration.InactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.migration.LiveInactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.migration.LiveLidMigrationService;
-import com.github.auties00.cobalt.model.bot.AiThreadTitleBuilder;
-import com.github.auties00.cobalt.model.bot.BotMetadata;
-import com.github.auties00.cobalt.model.bot.profile.*;
-import com.github.auties00.cobalt.model.bot.response.AIRichResponseUnifiedResponse;
-import com.github.auties00.cobalt.model.business.*;
-import com.github.auties00.cobalt.model.business.acs.AnonymousCredentialIssuance;
-import com.github.auties00.cobalt.model.business.acs.AnonymousCredentialIssuanceRequest;
-import com.github.auties00.cobalt.model.business.acs.AnonymousCredentialServiceConfig;
-import com.github.auties00.cobalt.model.business.ads.*;
-import com.github.auties00.cobalt.model.business.ai.*;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelAgentStatus;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelCommand;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelIdentity;
-import com.github.auties00.cobalt.model.business.aichannel.AiChannelLinkedStatus;
-import com.github.auties00.cobalt.model.business.auth.*;
-import com.github.auties00.cobalt.model.business.cart.*;
-import com.github.auties00.cobalt.model.business.catalog.*;
-import com.github.auties00.cobalt.model.business.compliance.*;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingEligibility;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingEligibilityQuery;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingServiceData;
-import com.github.auties00.cobalt.model.business.ctwa.*;
-import com.github.auties00.cobalt.model.business.flow.BusinessFlowMetadata;
-import com.github.auties00.cobalt.model.business.linking.*;
-import com.github.auties00.cobalt.model.business.marketing.*;
-import com.github.auties00.cobalt.model.business.order.BusinessOrder;
-import com.github.auties00.cobalt.model.business.order.BusinessOrderItem;
-import com.github.auties00.cobalt.model.business.order.OrderLifecycleStatus;
-import com.github.auties00.cobalt.model.business.order.OrderPaymentStatus;
-import com.github.auties00.cobalt.model.business.postcode.BusinessPostcodeVerification;
-import com.github.auties00.cobalt.model.business.postcode.BusinessPostcodeVerificationBuilder;
-import com.github.auties00.cobalt.model.business.postcode.BusinessPostcodeVerificationResult;
-import com.github.auties00.cobalt.model.business.profile.*;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionActionLog;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionLogAcknowledgement;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionSurfaceBatch;
-import com.github.auties00.cobalt.model.business.promotion.QuickPromotionTriggerContext;
-import com.github.auties00.cobalt.model.business.subscription.BusinessSubscriptionEntryPoints;
-import com.github.auties00.cobalt.model.business.subscription.BusinessSubscriptions;
-import com.github.auties00.cobalt.model.business.support.*;
-import com.github.auties00.cobalt.model.business.waa.*;
-import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSession;
-import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSessionBuilder;
-import com.github.auties00.cobalt.model.call.*;
-import com.github.auties00.cobalt.model.call.CallLinkMedia;
-import com.github.auties00.cobalt.model.chat.*;
-import com.github.auties00.cobalt.model.chat.community.*;
-import com.github.auties00.cobalt.model.chat.group.*;
-import com.github.auties00.cobalt.model.contact.*;
-import com.github.auties00.cobalt.model.contact.UsernameState;
-import com.github.auties00.cobalt.model.device.DeviceProps;
-import com.github.auties00.cobalt.model.device.DevicePropsHistorySyncConfigBuilder;
-import com.github.auties00.cobalt.model.device.pairing.ClientPayload;
-import com.github.auties00.cobalt.model.error.DisconnectCode;
-import com.github.auties00.cobalt.model.federated.*;
-import com.github.auties00.cobalt.model.jid.*;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.media.SizedInputStream;
-import com.github.auties00.cobalt.model.message.*;
-import com.github.auties00.cobalt.model.message.bot.AIRichResponseMessage;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallCreationMessage;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallCreationMessageBuilder;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallEditMessage;
-import com.github.auties00.cobalt.model.message.call.ScheduledCallEditMessageBuilder;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextInfoBuilder;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageBuilder;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessageNativeFlowMessageBuilder;
-import com.github.auties00.cobalt.model.message.interactive.NativeFlowMessageInteractiveMessageNativeFlowButtonBuilder;
-import com.github.auties00.cobalt.model.message.media.*;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollEncValueBuilder;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessageBuilder;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.status.*;
-import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
-import com.github.auties00.cobalt.model.message.system.PinInChatMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
-import com.github.auties00.cobalt.model.message.system.history.FullHistorySyncOnDemandConfigBuilder;
-import com.github.auties00.cobalt.model.message.system.history.FullHistorySyncOnDemandRequestMetadataBuilder;
-import com.github.auties00.cobalt.model.message.system.peer.*;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
-import com.github.auties00.cobalt.model.newsletter.*;
-import com.github.auties00.cobalt.model.payment.*;
-import com.github.auties00.cobalt.model.preference.*;
-import com.github.auties00.cobalt.model.preference.Label;
-import com.github.auties00.cobalt.model.privacy.*;
-import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.model.reporting.*;
-import com.github.auties00.cobalt.model.setting.*;
-import com.github.auties00.cobalt.model.setting.notice.UserNotice;
-import com.github.auties00.cobalt.model.setting.notice.UserNoticeBundle;
-import com.github.auties00.cobalt.model.setting.notice.UserNoticeStage;
-import com.github.auties00.cobalt.model.setting.notice.UserNoticeStageQuery;
-import com.github.auties00.cobalt.model.setting.privacy.ContactBlacklistAddressingMode;
-import com.github.auties00.cobalt.model.setting.privacy.OptOutEntry;
-import com.github.auties00.cobalt.model.setting.privacy.OptOutListUpdate;
-import com.github.auties00.cobalt.model.setting.privacy.OptOutTarget;
-import com.github.auties00.cobalt.model.setting.push.PushConfig;
-import com.github.auties00.cobalt.model.signal.*;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRangeBuilder;
-import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
-import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
-import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
-import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
-import com.github.auties00.cobalt.model.sync.action.business.BroadcastListParticipantAction;
-import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
-import com.github.auties00.cobalt.model.sync.action.business.CtwaPerCustomerDataSharingAction;
-import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
-import com.github.auties00.cobalt.model.sync.action.chat.*;
-import com.github.auties00.cobalt.model.sync.action.chat.MuteAction;
-import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
-import com.github.auties00.cobalt.model.sync.action.contact.*;
-import com.github.auties00.cobalt.model.sync.action.device.ExternalWebBetaAction;
-import com.github.auties00.cobalt.model.sync.action.device.NuxAction;
-import com.github.auties00.cobalt.model.sync.action.device.TimeFormatAction;
-import com.github.auties00.cobalt.model.sync.action.media.*;
-import com.github.auties00.cobalt.model.sync.action.payment.*;
-import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisableLinkPreviewsAction;
-import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayAllCalls;
-import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
-import com.github.auties00.cobalt.model.sync.action.setting.*;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.linked.bot.AiThreadTitleBuilder;
+import com.github.auties00.cobalt.wire.linked.bot.BotMetadata;
+import com.github.auties00.cobalt.wire.linked.bot.profile.*;
+import com.github.auties00.cobalt.wire.linked.bot.response.AIRichResponseUnifiedResponse;
+import com.github.auties00.cobalt.wire.linked.business.*;
+import com.github.auties00.cobalt.wire.linked.business.acs.AnonymousCredentialIssuance;
+import com.github.auties00.cobalt.wire.linked.business.acs.AnonymousCredentialIssuanceRequest;
+import com.github.auties00.cobalt.wire.linked.business.acs.AnonymousCredentialServiceConfig;
+import com.github.auties00.cobalt.wire.linked.business.ads.*;
+import com.github.auties00.cobalt.wire.linked.business.ai.*;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelAgentStatus;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelCommand;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelIdentity;
+import com.github.auties00.cobalt.wire.linked.business.aichannel.AiChannelLinkedStatus;
+import com.github.auties00.cobalt.wire.linked.business.auth.*;
+import com.github.auties00.cobalt.wire.linked.business.cart.*;
+import com.github.auties00.cobalt.wire.linked.business.catalog.*;
+import com.github.auties00.cobalt.wire.linked.business.compliance.*;
+import com.github.auties00.cobalt.wire.linked.business.crossposting.CrossPostingEligibility;
+import com.github.auties00.cobalt.wire.linked.business.crossposting.CrossPostingEligibilityQuery;
+import com.github.auties00.cobalt.wire.linked.business.crossposting.CrossPostingServiceData;
+import com.github.auties00.cobalt.wire.linked.business.ctwa.*;
+import com.github.auties00.cobalt.wire.linked.business.flow.BusinessFlowMetadata;
+import com.github.auties00.cobalt.wire.linked.business.linking.*;
+import com.github.auties00.cobalt.wire.linked.business.marketing.*;
+import com.github.auties00.cobalt.wire.linked.business.order.BusinessOrder;
+import com.github.auties00.cobalt.wire.linked.business.order.BusinessOrderItem;
+import com.github.auties00.cobalt.wire.linked.business.order.OrderLifecycleStatus;
+import com.github.auties00.cobalt.wire.linked.business.order.OrderPaymentStatus;
+import com.github.auties00.cobalt.wire.linked.business.postcode.BusinessPostcodeVerification;
+import com.github.auties00.cobalt.wire.linked.business.postcode.BusinessPostcodeVerificationBuilder;
+import com.github.auties00.cobalt.wire.linked.business.postcode.BusinessPostcodeVerificationResult;
+import com.github.auties00.cobalt.wire.linked.business.profile.*;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionActionLog;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionLogAcknowledgement;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionSurfaceBatch;
+import com.github.auties00.cobalt.wire.linked.business.promotion.QuickPromotionTriggerContext;
+import com.github.auties00.cobalt.wire.linked.business.subscription.BusinessSubscriptionEntryPoints;
+import com.github.auties00.cobalt.wire.linked.business.subscription.BusinessSubscriptions;
+import com.github.auties00.cobalt.wire.linked.business.support.*;
+import com.github.auties00.cobalt.wire.linked.business.waa.*;
+import com.github.auties00.cobalt.wire.linked.business.webgraphql.WhatsAppWebGraphQlSession;
+import com.github.auties00.cobalt.wire.linked.business.webgraphql.WhatsAppWebGraphQlSessionBuilder;
+import com.github.auties00.cobalt.wire.linked.call.*;
+import com.github.auties00.cobalt.wire.linked.call.CallLinkMedia;
+import com.github.auties00.cobalt.wire.linked.chat.*;
+import com.github.auties00.cobalt.wire.linked.chat.community.*;
+import com.github.auties00.cobalt.wire.linked.chat.group.*;
+import com.github.auties00.cobalt.wire.linked.contact.*;
+import com.github.auties00.cobalt.wire.linked.contact.UsernameState;
+import com.github.auties00.cobalt.wire.linked.device.DeviceProps;
+import com.github.auties00.cobalt.wire.linked.device.DevicePropsHistorySyncConfigBuilder;
+import com.github.auties00.cobalt.wire.linked.device.pairing.ClientPayload;
+import com.github.auties00.cobalt.wire.linked.error.DisconnectCode;
+import com.github.auties00.cobalt.wire.linked.federated.*;
+import com.github.auties00.cobalt.wire.core.jid.*;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.stanza.model.SizedInputStream;
+import com.github.auties00.cobalt.wire.linked.message.*;
+import com.github.auties00.cobalt.wire.core.message.*;
+import com.github.auties00.cobalt.wire.linked.message.bot.AIRichResponseMessage;
+import com.github.auties00.cobalt.wire.linked.message.call.ScheduledCallCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.call.ScheduledCallCreationMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.call.ScheduledCallEditMessage;
+import com.github.auties00.cobalt.wire.linked.message.call.ScheduledCallEditMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfoBuilder;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.InteractiveMessageNativeFlowMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.interactive.NativeFlowMessageInteractiveMessageNativeFlowButtonBuilder;
+import com.github.auties00.cobalt.wire.linked.message.media.*;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollEncValueBuilder;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.security.EncReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.status.*;
+import com.github.auties00.cobalt.wire.linked.message.system.PinInChatMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.PinInChatMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.history.FullHistorySyncOnDemandConfigBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.history.FullHistorySyncOnDemandRequestMetadataBuilder;
+import com.github.auties00.cobalt.wire.linked.message.system.peer.*;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ReactionMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.newsletter.*;
+import com.github.auties00.cobalt.wire.linked.payment.*;
+import com.github.auties00.cobalt.wire.linked.preference.*;
+import com.github.auties00.cobalt.wire.linked.preference.Label;
+import com.github.auties00.cobalt.wire.linked.privacy.*;
+import com.github.auties00.cobalt.wire.linked.props.ABProp;
+import com.github.auties00.cobalt.wire.linked.reporting.*;
+import com.github.auties00.cobalt.wire.linked.setting.*;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNotice;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNoticeBundle;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNoticeStage;
+import com.github.auties00.cobalt.wire.linked.setting.notice.UserNoticeStageQuery;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.ContactBlacklistAddressingMode;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.OptOutEntry;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.OptOutListUpdate;
+import com.github.auties00.cobalt.wire.linked.setting.privacy.OptOutTarget;
+import com.github.auties00.cobalt.wire.linked.setting.push.PushConfig;
+import com.github.auties00.cobalt.wire.linked.signal.*;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRange;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionMessageRangeBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.SyncActionValueBuilder;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.AiThreadRenameAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.BotWelcomeRequestAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.bot.MaibaAIFeaturesControlAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BroadcastListParticipantAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.BusinessBroadcastListAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.business.CtwaPerCustomerDataSharingAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.call.CallLogAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.*;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.MuteAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.QuickReplyAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.contact.*;
+import com.github.auties00.cobalt.wire.linked.sync.action.device.ExternalWebBetaAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.device.NuxAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.device.TimeFormatAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.media.*;
+import com.github.auties00.cobalt.wire.linked.sync.action.payment.*;
+import com.github.auties00.cobalt.wire.linked.sync.action.privacy.PrivacySettingDisableLinkPreviewsAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.privacy.PrivacySettingRelayAllCalls;
+import com.github.auties00.cobalt.wire.linked.sync.action.privacy.PrivateProcessingSettingAction;
+import com.github.auties00.cobalt.wire.linked.sync.action.setting.*;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.net.*;
 import com.github.auties00.vigil.ConnectivityMonitor;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
@@ -228,102 +233,102 @@ import com.github.auties00.cobalt.quarantine.QuarantineService;
 import com.github.auties00.cobalt.socket.WhatsAppSocketClient;
 import com.github.auties00.cobalt.socket.WhatsAppSocketListener;
 import com.github.auties00.cobalt.socket.WhatsAppSocketStanza;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
-import com.github.auties00.cobalt.stanza.iq.IqStanza;
-import com.github.auties00.cobalt.stanza.iq.account.IqUnpairDeviceRequest;
-import com.github.auties00.cobalt.stanza.iq.account.IqUnpairDeviceResponse;
-import com.github.auties00.cobalt.stanza.iq.biz.*;
-import com.github.auties00.cobalt.stanza.iq.ctwa.IqQueryCtwaContextRequest;
-import com.github.auties00.cobalt.stanza.iq.ctwa.IqQueryCtwaContextResponse;
-import com.github.auties00.cobalt.stanza.iq.debug.IqDebugGdprReportType;
-import com.github.auties00.cobalt.stanza.iq.debug.IqDebugGdprRequest;
-import com.github.auties00.cobalt.stanza.iq.debug.IqDebugGdprResponse;
-import com.github.auties00.cobalt.stanza.iq.dirty.IqClearDirtyBitsRequest;
-import com.github.auties00.cobalt.stanza.iq.dirty.IqClearDirtyBitsResponse;
-import com.github.auties00.cobalt.stanza.iq.disappearing.IqQueryDisappearingModeRequest;
-import com.github.auties00.cobalt.stanza.iq.disappearing.IqQueryDisappearingModeResponse;
-import com.github.auties00.cobalt.stanza.iq.disappearing.IqSetDisappearingModeRequest;
-import com.github.auties00.cobalt.stanza.iq.disappearing.IqSetDisappearingModeResponse;
-import com.github.auties00.cobalt.stanza.iq.encrypt.*;
-import com.github.auties00.cobalt.stanza.iq.group.*;
-import com.github.auties00.cobalt.stanza.iq.privacy.*;
-import com.github.auties00.cobalt.stanza.iq.profilepicture.IqSendProfilePictureRequest;
-import com.github.auties00.cobalt.stanza.iq.profilepicture.IqSendProfilePictureResponse;
-import com.github.auties00.cobalt.stanza.iq.push.IqGetPushServerSettingsRequest;
-import com.github.auties00.cobalt.stanza.iq.push.IqGetPushServerSettingsResponse;
-import com.github.auties00.cobalt.stanza.iq.stats.IqIssuePrivateStatsTokenRequest;
-import com.github.auties00.cobalt.stanza.iq.stats.IqIssuePrivateStatsTokenResponse;
-import com.github.auties00.cobalt.stanza.iq.status.*;
-import com.github.auties00.cobalt.stanza.iq.tos.*;
-import com.github.auties00.cobalt.stanza.mex.MexStanza;
-import com.github.auties00.cobalt.stanza.mex.json.MexGroupQueryContext;
-import com.github.auties00.cobalt.stanza.mex.json.community.*;
-import com.github.auties00.cobalt.stanza.mex.json.community.FetchAllSubgroupsMexResponse.DefaultSubGroup;
-import com.github.auties00.cobalt.stanza.mex.json.community.FetchAllSubgroupsMexResponse.SubGroups;
-import com.github.auties00.cobalt.stanza.mex.json.group.*;
-import com.github.auties00.cobalt.stanza.mex.json.misc.*;
-import com.github.auties00.cobalt.stanza.mex.json.newsletter.*;
-import com.github.auties00.cobalt.stanza.mex.json.user.*;
-import com.github.auties00.cobalt.stanza.smax.SmaxStanza;
-import com.github.auties00.cobalt.stanza.smax.abprops.SmaxAbPropsGetExperimentConfigRequest;
-import com.github.auties00.cobalt.stanza.smax.abprops.SmaxAbPropsGetExperimentConfigResponse;
-import com.github.auties00.cobalt.stanza.smax.abprops.SmaxAbPropsGetGroupExperimentConfigRequest;
-import com.github.auties00.cobalt.stanza.smax.abprops.SmaxAbPropsGetGroupExperimentConfigResponse;
-import com.github.auties00.cobalt.stanza.smax.account.*;
-import com.github.auties00.cobalt.stanza.smax.biz.*;
-import com.github.auties00.cobalt.stanza.smax.bot.SmaxBotBotListRequest;
-import com.github.auties00.cobalt.stanza.smax.bot.SmaxBotBotListResponse;
-import com.github.auties00.cobalt.stanza.smax.bugreporting.SmaxBugReportingReportBugMediaUpload;
-import com.github.auties00.cobalt.stanza.smax.bugreporting.SmaxBugReportingReportBugRequest;
-import com.github.auties00.cobalt.stanza.smax.bugreporting.SmaxBugReportingReportBugResponse;
-import com.github.auties00.cobalt.stanza.smax.chatstate.SmaxClientNotificationComposing;
-import com.github.auties00.cobalt.stanza.smax.chatstate.SmaxClientNotificationPaused;
-import com.github.auties00.cobalt.stanza.smax.chatstate.SmaxClientNotificationRequest;
-import com.github.auties00.cobalt.stanza.smax.groups.*;
-import com.github.auties00.cobalt.stanza.smax.inappcomms.SmaxInAppCommsEventRequest;
-import com.github.auties00.cobalt.stanza.smax.inappcomms.SmaxInAppCommsEventResponse;
-import com.github.auties00.cobalt.stanza.smax.message.SmaxMessagePublishNewsletterPayload;
-import com.github.auties00.cobalt.stanza.smax.message.SmaxMessagePublishNewsletterRequest;
-import com.github.auties00.cobalt.stanza.smax.message.SmaxMessagePublishNewsletterResponse;
-import com.github.auties00.cobalt.stanza.smax.newsletters.*;
-import com.github.auties00.cobalt.stanza.smax.offlinebatch.SmaxOfflineBatchRequest;
-import com.github.auties00.cobalt.stanza.smax.passivemode.SmaxPassiveModeActiveIQRequest;
-import com.github.auties00.cobalt.stanza.smax.passivemode.SmaxPassiveModeActiveIQResponse;
-import com.github.auties00.cobalt.stanza.smax.passivemode.SmaxPassiveModePassiveIQRequest;
-import com.github.auties00.cobalt.stanza.smax.passivemode.SmaxPassiveModePassiveIQResponse;
-import com.github.auties00.cobalt.stanza.smax.pings.SmaxPingsClientRequest;
-import com.github.auties00.cobalt.stanza.smax.prekeys.SmaxPreKeysFetchKeyBundlesRequest;
-import com.github.auties00.cobalt.stanza.smax.prekeys.SmaxPreKeysFetchKeyBundlesResponse;
-import com.github.auties00.cobalt.stanza.smax.prekeys.SmaxPreKeysFetchMissingPreKeysRequest;
-import com.github.auties00.cobalt.stanza.smax.prekeys.SmaxPreKeysFetchMissingPreKeysResponse;
-import com.github.auties00.cobalt.stanza.smax.presence.SmaxAvailabilityRequest;
-import com.github.auties00.cobalt.stanza.smax.presence.SmaxSubscribeRequest;
-import com.github.auties00.cobalt.stanza.smax.privacy.*;
-import com.github.auties00.cobalt.stanza.smax.privatestats.SmaxPrivatestatsSignCredentialRequest;
-import com.github.auties00.cobalt.stanza.smax.privatestats.SmaxPrivatestatsSignCredentialResponse;
-import com.github.auties00.cobalt.stanza.smax.profilepicture.SmaxProfilePictureGetRequest;
-import com.github.auties00.cobalt.stanza.smax.profilepicture.SmaxProfilePictureGetResponse;
-import com.github.auties00.cobalt.stanza.smax.psa.*;
-import com.github.auties00.cobalt.stanza.smax.pushconfig.SmaxPushConfigSetConfigVariant;
-import com.github.auties00.cobalt.stanza.smax.pushconfig.SmaxPushConfigSetRequest;
-import com.github.auties00.cobalt.stanza.smax.pushconfig.SmaxPushConfigSetResponse;
-import com.github.auties00.cobalt.stanza.smax.pushconfig.SmaxPushConfigSetSetVariant;
-import com.github.auties00.cobalt.stanza.smax.status.SmaxStatusPublishPostNewsletterStatusPayload;
-import com.github.auties00.cobalt.stanza.smax.status.SmaxStatusPublishPostNewsletterStatusRequest;
-import com.github.auties00.cobalt.stanza.smax.status.SmaxStatusPublishPostNewsletterStatusResponse;
-import com.github.auties00.cobalt.stanza.smax.support.*;
-import com.github.auties00.cobalt.stanza.smax.unifiedsession.SmaxUnifiedSessionShareRequest;
-import com.github.auties00.cobalt.stanza.smax.usernotice.SmaxUserNoticeGetDisclosureStageByIdsRequest;
-import com.github.auties00.cobalt.stanza.smax.usernotice.SmaxUserNoticeGetDisclosureStageByIdsResponse;
-import com.github.auties00.cobalt.stanza.smax.usernotice.SmaxUserNoticeGetDisclosuresRequest;
-import com.github.auties00.cobalt.stanza.smax.usernotice.SmaxUserNoticeGetDisclosuresResponse;
-import com.github.auties00.cobalt.stanza.smax.voip.*;
-import com.github.auties00.cobalt.stanza.smax.waffle.*;
-import com.github.auties00.cobalt.stanza.usync.*;
-import com.github.auties00.cobalt.stanza.usync.protocol.UsyncContactProtocol;
-import com.github.auties00.cobalt.stanza.usync.result.ContactResult;
-import com.github.auties00.cobalt.stanza.usync.result.UsyncProtocolError;
+import com.github.auties00.cobalt.stanza.model.Stanza;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
+import com.github.auties00.cobalt.wire.stanza.iq.IqStanza;
+import com.github.auties00.cobalt.wire.stanza.iq.account.IqUnpairDeviceRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.account.IqUnpairDeviceResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.biz.*;
+import com.github.auties00.cobalt.wire.stanza.iq.ctwa.IqQueryCtwaContextRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.ctwa.IqQueryCtwaContextResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.debug.IqDebugGdprReportType;
+import com.github.auties00.cobalt.wire.stanza.iq.debug.IqDebugGdprRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.debug.IqDebugGdprResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.dirty.IqClearDirtyBitsRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.dirty.IqClearDirtyBitsResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.disappearing.IqQueryDisappearingModeRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.disappearing.IqQueryDisappearingModeResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.disappearing.IqSetDisappearingModeRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.disappearing.IqSetDisappearingModeResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.encrypt.*;
+import com.github.auties00.cobalt.wire.stanza.iq.group.*;
+import com.github.auties00.cobalt.wire.stanza.iq.privacy.*;
+import com.github.auties00.cobalt.wire.stanza.iq.profilepicture.IqSendProfilePictureRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.profilepicture.IqSendProfilePictureResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.push.IqGetPushServerSettingsRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.push.IqGetPushServerSettingsResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.stats.IqIssuePrivateStatsTokenRequest;
+import com.github.auties00.cobalt.wire.stanza.iq.stats.IqIssuePrivateStatsTokenResponse;
+import com.github.auties00.cobalt.wire.stanza.iq.status.*;
+import com.github.auties00.cobalt.wire.stanza.iq.tos.*;
+import com.github.auties00.cobalt.wire.stanza.mex.MexStanza;
+import com.github.auties00.cobalt.wire.stanza.mex.json.MexGroupQueryContext;
+import com.github.auties00.cobalt.wire.stanza.mex.json.community.*;
+import com.github.auties00.cobalt.wire.stanza.mex.json.community.FetchAllSubgroupsMexResponse.DefaultSubGroup;
+import com.github.auties00.cobalt.wire.stanza.mex.json.community.FetchAllSubgroupsMexResponse.SubGroups;
+import com.github.auties00.cobalt.wire.stanza.mex.json.group.*;
+import com.github.auties00.cobalt.wire.stanza.mex.json.misc.*;
+import com.github.auties00.cobalt.wire.stanza.mex.json.newsletter.*;
+import com.github.auties00.cobalt.wire.stanza.mex.json.user.*;
+import com.github.auties00.cobalt.wire.stanza.smax.SmaxStanza;
+import com.github.auties00.cobalt.wire.stanza.smax.abprops.SmaxAbPropsGetExperimentConfigRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.abprops.SmaxAbPropsGetExperimentConfigResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.abprops.SmaxAbPropsGetGroupExperimentConfigRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.abprops.SmaxAbPropsGetGroupExperimentConfigResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.account.*;
+import com.github.auties00.cobalt.wire.stanza.smax.biz.*;
+import com.github.auties00.cobalt.wire.stanza.smax.bot.SmaxBotBotListRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.bot.SmaxBotBotListResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.bugreporting.SmaxBugReportingReportBugMediaUpload;
+import com.github.auties00.cobalt.wire.stanza.smax.bugreporting.SmaxBugReportingReportBugRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.bugreporting.SmaxBugReportingReportBugResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.chatstate.SmaxClientNotificationComposing;
+import com.github.auties00.cobalt.wire.stanza.smax.chatstate.SmaxClientNotificationPaused;
+import com.github.auties00.cobalt.wire.stanza.smax.chatstate.SmaxClientNotificationRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.groups.*;
+import com.github.auties00.cobalt.wire.stanza.smax.inappcomms.SmaxInAppCommsEventRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.inappcomms.SmaxInAppCommsEventResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.message.SmaxMessagePublishNewsletterPayload;
+import com.github.auties00.cobalt.wire.stanza.smax.message.SmaxMessagePublishNewsletterRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.message.SmaxMessagePublishNewsletterResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.newsletters.*;
+import com.github.auties00.cobalt.wire.stanza.smax.offlinebatch.SmaxOfflineBatchRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.passivemode.SmaxPassiveModeActiveIQRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.passivemode.SmaxPassiveModeActiveIQResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.passivemode.SmaxPassiveModePassiveIQRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.passivemode.SmaxPassiveModePassiveIQResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.pings.SmaxPingsClientRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.prekeys.SmaxPreKeysFetchKeyBundlesRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.prekeys.SmaxPreKeysFetchKeyBundlesResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.prekeys.SmaxPreKeysFetchMissingPreKeysRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.prekeys.SmaxPreKeysFetchMissingPreKeysResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.presence.SmaxAvailabilityRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.presence.SmaxSubscribeRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.privacy.*;
+import com.github.auties00.cobalt.wire.stanza.smax.privatestats.SmaxPrivatestatsSignCredentialRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.privatestats.SmaxPrivatestatsSignCredentialResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.profilepicture.SmaxProfilePictureGetRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.profilepicture.SmaxProfilePictureGetResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.psa.*;
+import com.github.auties00.cobalt.wire.stanza.smax.pushconfig.SmaxPushConfigSetConfigVariant;
+import com.github.auties00.cobalt.wire.stanza.smax.pushconfig.SmaxPushConfigSetRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.pushconfig.SmaxPushConfigSetResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.pushconfig.SmaxPushConfigSetSetVariant;
+import com.github.auties00.cobalt.wire.stanza.smax.status.SmaxStatusPublishPostNewsletterStatusPayload;
+import com.github.auties00.cobalt.wire.stanza.smax.status.SmaxStatusPublishPostNewsletterStatusRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.status.SmaxStatusPublishPostNewsletterStatusResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.support.*;
+import com.github.auties00.cobalt.wire.stanza.smax.unifiedsession.SmaxUnifiedSessionShareRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.usernotice.SmaxUserNoticeGetDisclosureStageByIdsRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.usernotice.SmaxUserNoticeGetDisclosureStageByIdsResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.usernotice.SmaxUserNoticeGetDisclosuresRequest;
+import com.github.auties00.cobalt.wire.stanza.smax.usernotice.SmaxUserNoticeGetDisclosuresResponse;
+import com.github.auties00.cobalt.wire.stanza.smax.voip.*;
+import com.github.auties00.cobalt.wire.stanza.smax.waffle.*;
+import com.github.auties00.cobalt.wire.stanza.usync.*;
+import com.github.auties00.cobalt.wire.stanza.usync.protocol.UsyncContactProtocol;
+import com.github.auties00.cobalt.wire.stanza.usync.result.ContactResult;
+import com.github.auties00.cobalt.wire.stanza.usync.result.UsyncProtocolError;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
@@ -340,16 +345,17 @@ import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.tos.LiveTosService;
 import com.github.auties00.cobalt.tos.TosService;
 import com.github.auties00.cobalt.util.BusinessLabelConstants;
-import com.github.auties00.cobalt.util.DataUtils;
-import com.github.auties00.cobalt.util.RandomIdUtils;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
+import com.github.auties00.cobalt.wire.core.util.RandomIdUtils;
 import com.github.auties00.cobalt.wam.*;
-import com.github.auties00.cobalt.wam.event.*;
+import com.github.auties00.cobalt.wire.wam.event.*;
 import com.github.auties00.cobalt.wam.threadlogging.LiveThreadLoggingService;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingActivity;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingMessages;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingService;
 import com.github.auties00.cobalt.wam.synthetic.*;
-import com.github.auties00.cobalt.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.type.*;
+import com.github.auties00.cobalt.wire.wam.type.MediaType;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -821,11 +827,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private final CallLogMutationFactory callLogMutationFactory;
     /**
-     * The calls2 outbound call-log sync, recording each ended call into the runtime call-history table and
+     * The calls outbound call-log sync, recording each ended call into the runtime call-history table and
      * pushing the {@code call_log} app-state mutation, bound onto the engine's lifecycle controller so a
      * call end is logged and replicated.
      */
-    private final CallLogSync calls2CallLogSync;
+    private final CallLogSync callsCallLogSync;
     /**
      * Factory that builds outgoing NUX (onboarding-hint) sync mutations.
      */
@@ -1115,9 +1121,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.pendingSocketRequests = new ConcurrentHashMap<>();
         this.companionPairingService = new LiveCompanionPairingService(this, webVerificationHandler);
         this.shortcakePairingService = new LiveShortcakePairingService(this, webVerificationHandler, passkeyAuthenticator);
-        var calls2EventBus = new LiveCallEventBus(this);
-        this.calls2CallLogSync = new CallLogSync(this, callLogMutationFactory, webAppStateService);
-        this.callsService = new LiveCallsService(this, wamService, messageService, messageEncryption, deviceService, store, abPropsService, calls2EventBus, calls2CallLogSync);
+        var callsEventBus = new LiveCallEventBus(this);
+        this.callsCallLogSync = new CallLogSync(this, callLogMutationFactory, webAppStateService);
+        this.callsService = new LiveCallsService(this, wamService, messageService, messageEncryption, deviceService, store, abPropsService, callsEventBus, callsCallLogSync);
         var ackSender = new AckSender(this);
         this.nodeStreamService = new LiveNodeStreamService(this, callsService, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, shortcakePairingService, ackSender, mediaConnectionService, tosService, quarantineService, passkeyAuthenticator);
         this.disconnecting = new AtomicBoolean();
@@ -1833,7 +1839,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             if (Log.WARNING) LOGGER.log(Level.WARNING, "whatsapp web graphql lsd fetch failed", exception);
             throw new WhatsAppWebGraphQlException.LsdFetchFailed(exception);
         }
-        var credentials = new CanonicalCredentials(canonicalAccessToken, fbid, null, deviceId);
+        var credentials = new WhatsAppWebGraphQlCanonicalCredentials(canonicalAccessToken, fbid, null, deviceId);
         if (!bootstrap.exchange(credentials, lsd)) {
             if (Log.WARNING)
                 LOGGER.log(Level.WARNING, "whatsapp web graphql canonical token exchange rejected");
@@ -1868,7 +1874,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * {@code xwa2_ent_trade_canonical_nonce_for_access_tokens} mutation carrying the doubly
      * base64-encoded public key and a random {@code request_id}, then decrypts the returned
      * RSA-with-AES bundle with the retained private key. On success the recovered
-     * {@link CanonicalCredentials} carry a minted {@code access_token} and its {@code fbid}, ready to
+     * {@link WhatsAppWebGraphQlCanonicalCredentials} carry a minted {@code access_token} and its {@code fbid}, ready to
      * feed {@link #bootstrapAndExchange(String, long, int)}. Any transport failure, an absent bundle,
      * or a decryption failure yields {@link Optional#empty()} so the caller can fall back to the
      * unseeded-session path.
@@ -1877,9 +1883,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebMexCachedTokenJob", exports = "fetchCachedNonceToken",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private Optional<CanonicalCredentials> fetchCachedNonceToken() {
+    private Optional<WhatsAppWebGraphQlCanonicalCredentials> fetchCachedNonceToken() {
         try {
-            var keyPair = CachedTokenKeyPair.generate();
+            var keyPair = WhatsAppWebGraphQlCachedTokenKeyPair.generate();
             var request = new CachedTokenMexRequest(keyPair.clientPubKey(), UUID.randomUUID().toString());
             var response = sendNode(request);
             var bundle = CachedTokenMexResponse.of(response)
@@ -1888,7 +1894,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             if (bundle == null) {
                 return Optional.empty();
             }
-            return CachedTokenDecryptor.decrypt(keyPair.privateKey(), bundle);
+            return WhatsAppWebGraphQlCachedTokenDecryptor.decrypt(keyPair.privateKey(), bundle);
         } catch (RuntimeException exception) {
             return Optional.empty();
         }
@@ -2509,21 +2515,21 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     /**
      * Extracts the affected {@link SyncPatchType} from an app-state sync
      * exception (when it carries one) and maps it to the WAM
-     * {@link com.github.auties00.cobalt.wam.type.Collection} enum.
+     * {@link com.github.auties00.cobalt.wire.wam.type.Collection} enum.
      *
      * <p>Mirrors WA Web's
      * {@code WAWebSyncdMetrics.collectionNameToMetric} conversion, which
      * translates the wire collection name to the WAM enum constant.
      *
      * @param exception the app-state sync exception; never {@code null}
-     * @return the matching {@link com.github.auties00.cobalt.wam.type.Collection}
+     * @return the matching {@link com.github.auties00.cobalt.wire.wam.type.Collection}
      *         constant, or {@code null} when the exception does not carry
      *         a collection
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics",
             exports = "collectionNameToMetric",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static com.github.auties00.cobalt.wam.type.Collection extractSyncdCollection(WhatsAppWebAppStateSyncException exception) {
+    private static com.github.auties00.cobalt.wire.wam.type.Collection extractSyncdCollection(WhatsAppWebAppStateSyncException exception) {
         var patchType = switch (exception) {
             case WhatsAppWebAppStateSyncException.SnapshotMacMismatch e -> e.collectionName();
             case WhatsAppWebAppStateSyncException.PatchMacMismatch e -> e.collectionName();
@@ -2537,11 +2543,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             return null;
         }
         return switch (patchType) {
-            case CRITICAL_BLOCK -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_BLOCK;
-            case CRITICAL_UNBLOCK_LOW -> com.github.auties00.cobalt.wam.type.Collection.CRITICAL_UNBLOCK_LOW;
-            case REGULAR -> com.github.auties00.cobalt.wam.type.Collection.REGULAR;
-            case REGULAR_HIGH -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_HIGH;
-            case REGULAR_LOW -> com.github.auties00.cobalt.wam.type.Collection.REGULAR_LOW;
+            case CRITICAL_BLOCK -> com.github.auties00.cobalt.wire.wam.type.Collection.CRITICAL_BLOCK;
+            case CRITICAL_UNBLOCK_LOW -> com.github.auties00.cobalt.wire.wam.type.Collection.CRITICAL_UNBLOCK_LOW;
+            case REGULAR -> com.github.auties00.cobalt.wire.wam.type.Collection.REGULAR;
+            case REGULAR_HIGH -> com.github.auties00.cobalt.wire.wam.type.Collection.REGULAR_HIGH;
+            case REGULAR_LOW -> com.github.auties00.cobalt.wire.wam.type.Collection.REGULAR_LOW;
         };
     }
     /** {@inheritDoc} */
@@ -3448,7 +3454,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var resolvedKeywords = List.copyOf(create.keywords());
         var timestamp = Instant.now();
         wamService.commit(new QuickReplyEventBuilder()
-                .quickReplyAction(com.github.auties00.cobalt.wam.type.QuickReplyAction.ACTION_SETTINGS_ADDED)
+                .quickReplyAction(com.github.auties00.cobalt.wire.wam.type.QuickReplyAction.ACTION_SETTINGS_ADDED)
                 .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU)
                 .build());
         var mutation = quickReplyMutationFactory.getQuickReplyAddOrEditMutation(
@@ -3483,7 +3489,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var timestamp = Instant.now();
         var currentCount = existing.get().count();
         wamService.commit(new QuickReplyEventBuilder()
-                .quickReplyAction(com.github.auties00.cobalt.wam.type.QuickReplyAction.ACTION_SETTINGS_EDITED)
+                .quickReplyAction(com.github.auties00.cobalt.wire.wam.type.QuickReplyAction.ACTION_SETTINGS_EDITED)
                 .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU)
                 .build());
         var mutation = quickReplyMutationFactory.getQuickReplyAddOrEditMutation(
@@ -3511,7 +3517,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             return Optional.empty();
         }
         wamService.commit(new QuickReplyEventBuilder()
-                .quickReplyAction(com.github.auties00.cobalt.wam.type.QuickReplyAction.ACTION_SETTINGS_DELETED)
+                .quickReplyAction(com.github.auties00.cobalt.wire.wam.type.QuickReplyAction.ACTION_SETTINGS_DELETED)
                 .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU)
                 .build());
         var mutation = quickReplyMutationFactory.getQuickReplyDeleteMutation(quickReplyId, Instant.now());
@@ -3659,10 +3665,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     /**
      * Rejects any call operation on a client that is not a {@link LinkedWhatsAppClientType#WEB} client.
      *
-     * <p>The calls2 engine reimplements the WhatsApp Web call transport exactly: an
+     * <p>The calls engine reimplements the WhatsApp Web call transport exactly: an
      * {@code RTCPeerConnection}-style stack (ICE, DTLS, a single SCTP data channel that carries all media
      * and control). Only the web client runs that transport; the mobile and desktop flavours use a
-     * different native transport that calls2 deliberately does not model. Call entry points invoke this
+     * different native transport that the calls engine deliberately does not model. Call entry points invoke this
      * guard first so a non-web client fails fast and clearly rather than later during transport bring-up.
      *
      * @throws UnsupportedOperationException if this client's {@link LinkedWhatsAppClientType} is not
@@ -4389,7 +4395,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                         : ScheduledCallCreationMessage.CallType.VOICE)
                 .title(title)
                 .build();
-        sendMessage(chat, MessageContainer.of(creation));
+        sendMessage(chat, LinkedMessageContainer.of(creation));
     }
 
     /** {@inheritDoc} */
@@ -4404,7 +4410,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .key(creationKey)
                 .editType(ScheduledCallEditMessage.EditType.CANCEL)
                 .build();
-        sendMessage(chat, MessageContainer.of(edit));
+        sendMessage(chat, LinkedMessageContainer.of(edit));
     }
 
     /** {@inheritDoc} */
@@ -5119,7 +5125,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .type(ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_MESSAGE)
                 .peerDataOperationRequestMessage(request)
                 .build();
-        var container = new MessageContainerBuilder()
+        var container = new LinkedMessageContainerBuilder()
                 .protocolMessage(protocolMessage)
                 .build();
         var messageId = MessageIdGenerator.generate(MessageIdVersion.V2, self);
@@ -5764,7 +5770,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .key(targetKey)
                 .serverId(target.serverId())
                 .timestamp(Instant.now())
-                .message(MessageContainer.of(protocol))
+                .message(LinkedMessageContainer.of(protocol))
                 .status(MessageStatus.PENDING)
                 .build();
         messageService.send(revokeInfo);
@@ -8236,7 +8242,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageKey sendMessage(JidProvider jidProvider, MessageContainer container) {
+    public MessageKey sendMessage(JidProvider jidProvider, LinkedMessageContainer container) {
         var jid = Objects.requireNonNull(jidProvider, "jid cannot be null").toJid();
         Objects.requireNonNull(container, "container cannot be null");
         var ack = messageService.send(jid, container);
@@ -8251,27 +8257,27 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /**
      * Records a {@link ThreadLoggingActivity.MessageSent} against the ctlv2 thread-logging aggregator
-     * for an outbound message dispatched through {@link #sendMessage(JidProvider, MessageContainer)}.
+     * for an outbound message dispatched through {@link #sendMessage(JidProvider, LinkedMessageContainer)}.
      *
      * <p>Classifies the container the way WhatsApp Web's send logger does: a reaction send bumps only
      * the reactions-sent counter, while any other content message bumps the messages-sent counter plus
      * whichever of the view-once, reply, and forwarded sub-counters apply. Protocol and system messages
      * (edits, revokes, and peer operations) are skipped here because their dedicated send paths
-     * ({@link #editMessage(MessageKey, MessageContainer)}, {@link #deleteMessage(MessageKey, boolean)})
+     * ({@link #editMessage(MessageKey, LinkedMessageContainer)}, {@link #deleteMessage(MessageKey, boolean)})
      * record their own activity. The reply flag is set only for one-on-one threads, matching the scope
      * of the replies-sent counter.
      *
      * @implNote This implementation never reports forwards or edits even when the container carries a
      * forwarding score or originates from an edit ceremony: those flow through
-     * {@link #forwardMessages(Collection, Collection)} and {@link #editMessage(MessageKey, MessageContainer)},
+     * {@link #forwardMessages(Collection, Collection)} and {@link #editMessage(MessageKey, LinkedMessageContainer)},
      * which call {@code messageService.send} directly and report their own activity, so reporting them
      * here too would double count. The commerce flag is sourced from
-     * {@link ThreadLoggingMessages#isCommerceMessage(MessageContainer)}.
+     * {@link ThreadLoggingMessages#isCommerceMessage(LinkedMessageContainer)}.
      *
      * @param jid       the destination thread
      * @param container the sent message container
      */
-    private void recordSentMessageActivity(Jid jid, MessageContainer container) {
+    private void recordSentMessageActivity(Jid jid, LinkedMessageContainer container) {
         var content = container.content();
         if (content instanceof ProtocolMessage) {
             return;
@@ -8304,7 +8310,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void sendMessage(MessageInfo messageInfo) {
+    public void sendMessage(LinkedMessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo cannot be null");
         messageService.send(messageInfo);
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent message id={0}", messageInfo.key().id());
@@ -8318,7 +8324,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSendMessageEditAction", exports = "addAndSendMessageEdit",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void editMessage(MessageKey originalKey, MessageContainer newContent) {
+    public void editMessage(MessageKey originalKey, LinkedMessageContainer newContent) {
         Objects.requireNonNull(originalKey, "originalKey cannot be null");
         Objects.requireNonNull(newContent, "newContent cannot be null");
         var parentJid = originalKey.parentJid()
@@ -8329,7 +8335,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .editedMessageContainer(newContent)
                 .timestampMs(Instant.now())
                 .build();
-        var wrapper = MessageContainer.of(protocol);
+        var wrapper = LinkedMessageContainer.of(protocol);
         var editStartMs = System.currentTimeMillis();
         messageService.send(parentJid, wrapper);
         var editBuilder = new EditMessageSendEventBuilder()
@@ -8390,7 +8396,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                     .type(ProtocolMessage.Type.REVOKE)
                     .timestampMs(sendInstant)
                     .build();
-            var wrapper = MessageContainer.of(protocol);
+            var wrapper = LinkedMessageContainer.of(protocol);
             var revokeStartMs = System.currentTimeMillis();
             var ack = messageService.send(parentJid, wrapper);
             emitMessageDeleteActionsEvent(parentJid, DeleteActionType.DELETE_FOR_EVERYONE, mediaType);
@@ -8910,7 +8916,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebLogNewsletterMessageForward", exports = "logNewsletterMessageForward",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void emitPsChannelPostForwardEvent(MessageInfo source, Jid destination, MessageContainer forwarded) {
+    private void emitPsChannelPostForwardEvent(LinkedMessageInfo source, Jid destination, LinkedMessageContainer forwarded) {
         if (!(source instanceof NewsletterMessageInfo newsletterSource)) {
             return;
         }
@@ -9325,7 +9331,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebWamStatusReportingEventsLogger", exports = "logStatusReportingEvent",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void emitStatusReportingEvent(MessageInfo status) {
+    private void emitStatusReportingEvent(LinkedMessageInfo status) {
         StatusPosterContactType posterType;
         switch (status) {
             case NewsletterMessageInfo _ -> posterType = StatusPosterContactType.CHANNEL;
@@ -9417,7 +9423,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSendStatusMsgAction", exports = "sendStatusMediaMsgAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public ChatMessageInfo sendStatus(MessageContainer content) {
+    public ChatMessageInfo sendStatus(LinkedMessageContainer content) {
         Objects.requireNonNull(content, "content cannot be null");
         return sendStatus(content, null, newStatusPostingSessionId());
     }
@@ -9431,7 +9437,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @param statusPostingSessionId the posting-session identifier grouping the emitted metrics
      * @return the posted status message
      */
-    private ChatMessageInfo sendStatus(MessageContainer content, StatusCreationEntryPoint entryPoint, int statusPostingSessionId) {
+    private ChatMessageInfo sendStatus(LinkedMessageContainer content, StatusCreationEntryPoint entryPoint, int statusPostingSessionId) {
         var statusJid = Jid.statusBroadcastAccount();
         var selfJid = store.accountStore().jid()
                 .orElseThrow(() -> new IllegalStateException("Not logged in"));
@@ -9553,18 +9559,18 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @return the status message container
      * @throws IllegalArgumentException if the message type cannot be reshared as a status
      */
-    private MessageContainer buildResharedStatusContent(ChatMessageInfo source, ContextInfo contextInfo) {
+    private LinkedMessageContainer buildResharedStatusContent(ChatMessageInfo source, ContextInfo contextInfo) {
         return switch (source.message().content()) {
-            case ExtendedTextMessage text -> MessageContainer.of(new ExtendedTextMessageBuilder()
+            case ExtendedTextMessage text -> LinkedMessageContainer.of(new ExtendedTextMessageBuilder()
                     .text(text.text().orElse(""))
                     .contextInfo(contextInfo)
                     .build());
-            case ImageMessage image -> MessageContainer.of(reshareMedia(new ImageMessageBuilder()
+            case ImageMessage image -> LinkedMessageContainer.of(reshareMedia(new ImageMessageBuilder()
                     .caption(image.caption().orElse(null))
                     .mimetype(image.mimetype().orElse(null))
                     .contextInfo(contextInfo)
                     .build(), image));
-            case VideoMessage video -> MessageContainer.of(reshareMedia(new VideoMessageBuilder()
+            case VideoMessage video -> LinkedMessageContainer.of(reshareMedia(new VideoMessageBuilder()
                     .caption(video.caption().orElse(null))
                     .mimetype(video.mimetype().orElse(null))
                     .gifPlayback(video.gifPlayback())
@@ -9593,7 +9599,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     /**
-     * Maps a status {@link MessageContainer}'s content to the WAM
+     * Maps a status {@link LinkedMessageContainer}'s content to the WAM
      * {@link StatusContentType} classification used by
      * {@link StatusPosterActionsEvent#statusContentType()}.
      *
@@ -9610,7 +9616,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebSendStatusMsgAction", exports = "y",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private StatusContentType resolveStatusContentType(MessageContainer content) {
+    private StatusContentType resolveStatusContentType(LinkedMessageContainer content) {
         return switch (content.content()) {
             case ExtendedTextMessage _ -> StatusContentType.TEXT;
             case ImageMessage _ -> StatusContentType.PHOTO;
@@ -9624,7 +9630,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /**
      * Generates a fresh {@code statusPostingSessionId} for one invocation of
-     * {@link #sendStatus(MessageContainer)} or {@link #deleteStatus(String)}.
+     * {@link #sendStatus(LinkedMessageContainer)} or {@link #deleteStatus(String)}.
      *
      * <p>WhatsApp Web's {@code StatusPosterActionsLogger} constructor seeds a
      * random integer and re-uses it across the three event emissions produced
@@ -9665,7 +9671,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .type(ProtocolMessage.Type.REVOKE)
                 .timestampMs(Instant.now())
                 .build();
-        var wrapper = MessageContainer.of(protocol);
+        var wrapper = LinkedMessageContainer.of(protocol);
         var statusPostingSessionId = newStatusPostingSessionId();
         wamService.commit(new StatusPosterActionsEventBuilder()
                 .statusEventType(StatusEventType.DELETE_STATUS_REQUEST)
@@ -9816,7 +9822,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void forwardMessages(Collection<MessageKey> sourceKeys, Collection<? extends JidProvider> destinationsProvider) {
         var destinations = Objects.requireNonNull(destinationsProvider, "destinations cannot be null").stream().map(JidProvider::toJid).toList();
         Objects.requireNonNull(sourceKeys, "sourceKeys cannot be null");
-        var resolvedSources = new ArrayList<MessageInfo>();
+        var resolvedSources = new ArrayList<LinkedMessageInfo>();
         for (var sourceKey : sourceKeys) {
             sourceKey.parentJid()
                     .flatMap(parent -> sourceKey.id()
@@ -9891,7 +9897,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .senderTimestampMs(Instant.now())
                 .build();
         // The preparer auto converts to EncReactionMessage for CAG groups.
-        messageService.send(parentJid, MessageContainer.of(reaction));
+        messageService.send(parentJid, LinkedMessageContainer.of(reaction));
         threadLoggingService.recordActivity(parentJid, new ThreadLoggingActivity.MessageSent(false, false, false, false, true, false));
     }
 
@@ -9917,7 +9923,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .text(emoji)
                 .senderTimestampMs(Instant.now())
                 .build();
-        messageService.send(newsletter, MessageContainer.of(reaction));
+        messageService.send(newsletter, LinkedMessageContainer.of(reaction));
     }
 
     /** {@inheritDoc} */
@@ -10021,7 +10027,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * the message belongs to the official WhatsApp PSA account.
      *
      * <p>The helper looks up the chat message associated with {@code key}
-     * and forwards to {@link #logPsaActionIfApplicable(MessageInfo, PsaMessageActionType)}.
+     * and forwards to {@link #logPsaActionIfApplicable(LinkedMessageInfo, PsaMessageActionType)}.
      * If the key cannot be resolved (for example because the message has
      * already been purged from the local store) no event is emitted; this
      * mirrors WA Web's behaviour of skipping the PSA log when the
@@ -10073,7 +10079,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebWamChatPSALogger", exports = "logChatPSAMediaPlay",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void logPsaActionIfApplicable(MessageInfo info, PsaMessageActionType actionType) {
+    private void logPsaActionIfApplicable(LinkedMessageInfo info, PsaMessageActionType actionType) {
         if (!(info instanceof ChatMessageInfo chatInfo)) {
             return;
         }
@@ -10131,14 +10137,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      *                  be {@code null}
      * @param destination the destination chat JID of the forwarded send; must
      *                    not be {@code null}
-     * @param forwarded the {@link MessageContainer} being dispatched; must not
+     * @param forwarded the {@link LinkedMessageContainer} being dispatched; must not
      *                  be {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgUtilsBridge", exports = "createMessageForwardMetric",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSendMsgRecordAction", exports = "sendMsgRecord",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private void emitForwardSendEvent(MessageInfo source, Jid destination, MessageContainer forwarded) {
+    private void emitForwardSendEvent(LinkedMessageInfo source, Jid destination, LinkedMessageContainer forwarded) {
         var mediaCaptionPresent = hasMediaCaption(forwarded);
         var numTimesForwarded = numTimesForwarded(source);
         var isFrequentlyForwarded = numTimesForwarded >= 127;
@@ -10161,7 +10167,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     /**
-     * Returns whether the forwarded {@link MessageContainer} carries a
+     * Returns whether the forwarded {@link LinkedMessageContainer} carries a
      * user-visible caption.
      *
      * <p>The helper mirrors WA Web's inline caption check inside
@@ -10179,7 +10185,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgUtilsBridge", exports = "createMessageForwardMetric",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static boolean hasMediaCaption(MessageContainer container) {
+    private static boolean hasMediaCaption(LinkedMessageContainer container) {
         if (container == null) {
             return false;
         }
@@ -10207,7 +10213,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgGetters", exports = "getNumTimesForwarded",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static int numTimesForwarded(MessageInfo source) {
+    private static int numTimesForwarded(LinkedMessageInfo source) {
         if (!(source instanceof ChatMessageInfo chatSource)) {
             return 0;
         }
@@ -10921,7 +10927,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSendBroadcastMsgAction", exports = "sendBroadcastMsgAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public ChatMessageInfo sendBroadcast(JidProvider broadcastListIdProvider, MessageContainer message) {
+    public ChatMessageInfo sendBroadcast(JidProvider broadcastListIdProvider, LinkedMessageContainer message) {
         var broadcastListId = Objects.requireNonNull(broadcastListIdProvider, "broadcastListId cannot be null").toJid();
         Objects.requireNonNull(message, "message cannot be null");
         var selfJid = store.accountStore().jid()
@@ -13073,7 +13079,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .vote(vote)
                 .senderTimestampMs(Instant.now())
                 .build();
-        messageService.send(parentJid, MessageContainer.of(pollUpdate));
+        messageService.send(parentJid, LinkedMessageContainer.of(pollUpdate));
         //   closePoll is modelled in Cobalt as an empty-vote PollUpdate, which
         //   maps onto WA Web's REMOVE_VOTE metric classification.
         var pollCreationTimestamp = Instant.now();
@@ -13487,7 +13493,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .type(PinInChatMessage.Type.PIN_FOR_ALL)
                 .senderTimestampMs(Instant.now())
                 .build();
-        messageService.send(parentJid, MessageContainer.of(pin));
+        messageService.send(parentJid, LinkedMessageContainer.of(pin));
         commitPinInChatMessageSendEvent(parentJid, msgKey, PinInChatType.PIN_FOR_ALL, null);
         emitPinMessageUserJourneyEvent(parentJid, msgKey, true);
     }
@@ -13505,7 +13511,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .type(PinInChatMessage.Type.UNPIN_FOR_ALL)
                 .senderTimestampMs(Instant.now())
                 .build();
-        messageService.send(parentJid, MessageContainer.of(pin));
+        messageService.send(parentJid, LinkedMessageContainer.of(pin));
         // Cobalt does not model an active-pin table with a TTL, so timeRemainingToExpirySecs is omitted rather than fabricated.
         commitPinInChatMessageSendEvent(parentJid, msgKey, PinInChatType.UNPIN_FOR_ALL, null);
         emitPinMessageUserJourneyEvent(parentJid, msgKey, false);
@@ -17502,7 +17508,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             exports = "sendStatusReportRPC", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WASmaxSpamStatusReportV2RPC",
             exports = "sendStatusReportV2RPC", adaptation = WhatsAppAdaptation.ADAPTED)
-    public void reportStatus(MessageInfo status, String reason, String subject) {
+    public void reportStatus(LinkedMessageInfo status, String reason, String subject) {
         Objects.requireNonNull(status, "status cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
         long timestamp = status.timestamp()
@@ -19227,7 +19233,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var interactive = new InteractiveMessageBuilder()
                 .nativeFlowMessage(nativeFlow)
                 .build();
-        return sendMessage(chat, MessageContainer.of(interactive));
+        return sendMessage(chat, LinkedMessageContainer.of(interactive));
     }
 
     /**

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.sticker;
 
 import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecParameters;
@@ -16,8 +16,8 @@ import com.github.auties00.cobalt.util.ffmpeg.FFmpegLoader;
 import com.github.auties00.cobalt.util.ffmpeg.Ffmpeg;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.media.transcode.avio.AvioReadBuffer;
-import com.github.auties00.cobalt.model.media.MediaProvider;
-import com.github.auties00.cobalt.model.message.media.StickerMessage;
+import com.github.auties00.cobalt.wire.linked.media.MediaProvider;
+import com.github.auties00.cobalt.wire.linked.message.media.StickerMessage;
 
 import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;

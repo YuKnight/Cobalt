@@ -40,14 +40,14 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
  * compile time:
  * <ul>
  *   <li>{@link Android} is used with any
- *       {@link com.github.auties00.cobalt.model.device.pairing.ClientPlatformType#ANDROID}
- *       or {@link com.github.auties00.cobalt.model.device.pairing.ClientPlatformType#ANDROID_BUSINESS}
+ *       {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType#ANDROID}
+ *       or {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType#ANDROID_BUSINESS}
  *       device and produces {@link Android.PlayIntegrityData},
  *       {@link Android.KeystoreAttestation}, and a
  *       {@link Android.DownloadSource};</li>
  *   <li>{@link Ios} is used with any
- *       {@link com.github.auties00.cobalt.model.device.pairing.ClientPlatformType#IOS}
- *       or {@link com.github.auties00.cobalt.model.device.pairing.ClientPlatformType#IOS_BUSINESS}
+ *       {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType#IOS}
+ *       or {@link com.github.auties00.cobalt.wire.linked.device.pairing.ClientPlatformType#IOS_BUSINESS}
  *       device and produces {@link Ios.AppAttestData}.</li>
  * </ul>
  * Both sub-interfaces are {@code non-sealed} so embedders can supply

@@ -2,11 +2,11 @@ package com.github.auties00.cobalt.calls.engine.participant;
 
 import com.github.auties00.cobalt.calls.media.sframe.SFrameKeyProvider;
 import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
-import com.github.auties00.cobalt.log.Log;
-import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
-import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyEntry;
-import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType;
-import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.E2eRekeyPayload;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RekeyKeyEntry;
+import com.github.auties00.cobalt.wire.linked.call.datachannel.RekeyKeyType;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;

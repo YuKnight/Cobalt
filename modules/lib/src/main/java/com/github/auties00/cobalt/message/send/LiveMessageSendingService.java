@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.message.send;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.dedup.MessageDedup;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
@@ -14,53 +14,53 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.migration.LidMigrationService;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.chat.group.GroupParticipantLabel;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.model.message.Message;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.message.MessageKey;
-import com.github.auties00.cobalt.model.message.FutureProofMessageType;
-import com.github.auties00.cobalt.model.message.context.ContextInfo;
-import com.github.auties00.cobalt.model.message.context.ContextualMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.AudioMessage;
-import com.github.auties00.cobalt.model.message.media.DocumentMessage;
-import com.github.auties00.cobalt.model.message.media.ImageMessage;
-import com.github.auties00.cobalt.model.message.media.StickerMessage;
-import com.github.auties00.cobalt.model.message.media.VideoMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.chat.group.GroupParticipantLabel;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.core.jid.JidServer;
+import com.github.auties00.cobalt.wire.linked.message.Message;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
+import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextInfo;
+import com.github.auties00.cobalt.wire.linked.message.context.ContextualMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactMessage;
+import com.github.auties00.cobalt.wire.linked.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.wire.linked.message.location.LocationMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.AudioMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.DocumentMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.ImageMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.StickerMessage;
+import com.github.auties00.cobalt.wire.linked.message.media.VideoMessage;
+import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.privacy.LiveTrustedContactTokenService;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.cobalt.wam.event.GroupMemberTagUpdateEventBuilder;
-import com.github.auties00.cobalt.wam.event.MessageSendEventBuilder;
-import com.github.auties00.cobalt.wam.event.SendDocumentEventBuilder;
-import com.github.auties00.cobalt.wam.event.StatusReplyEventBuilder;
-import com.github.auties00.cobalt.wam.event.WebcMessageSendEventBuilder;
-import com.github.auties00.cobalt.wam.type.ChatOriginsType;
-import com.github.auties00.cobalt.wam.type.DocumentType;
-import com.github.auties00.cobalt.wam.type.GroupMemberTagEntryPointType;
-import com.github.auties00.cobalt.wam.type.GroupMemberTagUpdateActionType;
-import com.github.auties00.cobalt.wam.type.MessageDistributionEnumType;
-import com.github.auties00.cobalt.wam.type.MessageSendResultType;
-import com.github.auties00.cobalt.wam.type.ReplyEntryMethod;
-import com.github.auties00.cobalt.wam.type.RevokeType;
-import com.github.auties00.cobalt.wam.type.StatusCategory;
-import com.github.auties00.cobalt.wam.type.StatusContentType;
-import com.github.auties00.cobalt.wam.type.StatusPosterContactType;
-import com.github.auties00.cobalt.wam.type.StatusReplyMessageType;
-import com.github.auties00.cobalt.wam.type.StatusReplyResult;
-import com.github.auties00.cobalt.wam.type.TsSurface;
+import com.github.auties00.cobalt.wire.wam.event.GroupMemberTagUpdateEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.MessageSendEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.SendDocumentEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.StatusReplyEventBuilder;
+import com.github.auties00.cobalt.wire.wam.event.WebcMessageSendEventBuilder;
+import com.github.auties00.cobalt.wire.wam.type.ChatOriginsType;
+import com.github.auties00.cobalt.wire.wam.type.DocumentType;
+import com.github.auties00.cobalt.wire.wam.type.GroupMemberTagEntryPointType;
+import com.github.auties00.cobalt.wire.wam.type.GroupMemberTagUpdateActionType;
+import com.github.auties00.cobalt.wire.wam.type.MessageDistributionEnumType;
+import com.github.auties00.cobalt.wire.wam.type.MessageSendResultType;
+import com.github.auties00.cobalt.wire.wam.type.ReplyEntryMethod;
+import com.github.auties00.cobalt.wire.wam.type.RevokeType;
+import com.github.auties00.cobalt.wire.wam.type.StatusCategory;
+import com.github.auties00.cobalt.wire.wam.type.StatusContentType;
+import com.github.auties00.cobalt.wire.wam.type.StatusPosterContactType;
+import com.github.auties00.cobalt.wire.wam.type.StatusReplyMessageType;
+import com.github.auties00.cobalt.wire.wam.type.StatusReplyResult;
+import com.github.auties00.cobalt.wire.wam.type.TsSurface;
 
 import java.lang.System.Logger.Level;
 import java.util.Locale;
@@ -72,8 +72,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * Live implementation of {@link MessageSendingService} that orchestrates every outgoing-message
  * wire dispatch.
  *
- * <p>The service prepares a raw {@link MessageContainer} into a fully-populated
- * {@link MessageInfo} via {@link MessagePreparer}, dedupes concurrent sends keyed by message id
+ * <p>The service prepares a raw {@link LinkedMessageContainer} into a fully-populated
+ * {@link LinkedMessageInfo} via {@link MessagePreparer}, dedupes concurrent sends keyed by message id
  * via {@link MessageDedup}, brackets the dispatch in a {@code WebcMessageSend} WAM event, then
  * routes by the parent JID's server kind to one of the per-chat-kind sub-senders:
  *
@@ -87,7 +87,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *       audience derived from the user's status privacy preferences.</li>
  *   <li>business broadcast list to {@link BroadcastMessageSender}: SKMSG against
  *       the audience read from the local
- *       {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList}
+ *       {@link com.github.auties00.cobalt.wire.linked.business.BusinessBroadcastList}
  *       roster.</li>
  *   <li>newsletter to {@link NewsletterMessageSender}: plaintext SMAX publish,
  *       no Signal envelope.</li>
@@ -203,7 +203,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
     );
 
     /**
-     * Turns a raw {@link MessageContainer} into a populated {@link MessageInfo}.
+     * Turns a raw {@link LinkedMessageContainer} into a populated {@link LinkedMessageInfo}.
      */
     private final MessagePreparer preparer;
 
@@ -349,7 +349,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public AckResult send(Jid chatJid, MessageContainer container) {
+    public AckResult send(Jid chatJid, LinkedMessageContainer container) {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
 
@@ -357,7 +357,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
             mediaTranscoderService.decorate(chatJid, extended);
         }
 
-        MessageInfo prepared;
+        LinkedMessageInfo prepared;
         if (chatJid.hasServer(JidServer.newsletter())) {
             prepared = preparer.prepareNewsletter(chatJid, container);
         } else {
@@ -370,7 +370,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public AckResult send(MessageInfo messageInfo) {
+    public AckResult send(LinkedMessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo");
 
         var messageId = messageInfo
@@ -523,7 +523,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgRecordAction", exports = "sendMsgRecord",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private WebcMessageSendEventBuilder buildWebcMessageSendEvent(MessageInfo messageInfo) {
+    private WebcMessageSendEventBuilder buildWebcMessageSendEvent(LinkedMessageInfo messageInfo) {
         if (!(messageInfo instanceof ChatMessageInfo chatMessage)) {
             return null;
         }
@@ -589,7 +589,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
      */
     @WhatsAppWebExport(moduleName = "WAWebMessageSendReporter", exports = "MessageSendReporter",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private MessageSendEventBuilder buildMessageSendEvent(MessageInfo messageInfo) {
+    private MessageSendEventBuilder buildMessageSendEvent(LinkedMessageInfo messageInfo) {
         if (!(messageInfo instanceof ChatMessageInfo chatMessage)) {
             return null;
         }
@@ -683,7 +683,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
         }
         var poster = contextInfo.quotedMessageSenderJid().orElse(null);
         var quotedContent = contextInfo.quotedMessageContent()
-                .map(MessageContainer::content)
+                .map(LinkedMessageContainer::content)
                 .orElse(null);
         var sessionId = ThreadLocalRandom.current().nextLong(1, 1L << 53);
         var viewerSessionId = ThreadLocalRandom.current().nextLong(1, 1L << 53);

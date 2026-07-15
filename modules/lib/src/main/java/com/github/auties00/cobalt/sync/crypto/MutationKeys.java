@@ -1,11 +1,11 @@
 package com.github.auties00.cobalt.sync.crypto;
 
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.util.DataUtils;
 
 import javax.crypto.Cipher;
 import javax.crypto.KDF;
@@ -190,13 +190,13 @@ public final class MutationKeys implements AutoCloseable {
 
     /**
      * The HMAC-SHA256 key used by
-     * {@link MutationIntegrityVerifier#computeSnapshotMac(SecretKeySpec, byte[], long, com.github.auties00.cobalt.model.sync.SyncPatchType)}.
+     * {@link MutationIntegrityVerifier#computeSnapshotMac(SecretKeySpec, byte[], long, com.github.auties00.cobalt.wire.linked.sync.SyncPatchType)}.
      */
     private final SecretKeySpec snapshotMacKey;
 
     /**
      * The HMAC-SHA256 key used by
-     * {@link MutationIntegrityVerifier#computePatchMac(SecretKeySpec, byte[], java.util.SequencedCollection, long, com.github.auties00.cobalt.model.sync.SyncPatchType)}.
+     * {@link MutationIntegrityVerifier#computePatchMac(SecretKeySpec, byte[], java.util.SequencedCollection, long, com.github.auties00.cobalt.wire.linked.sync.SyncPatchType)}.
      */
     private final SecretKeySpec patchMacKey;
 

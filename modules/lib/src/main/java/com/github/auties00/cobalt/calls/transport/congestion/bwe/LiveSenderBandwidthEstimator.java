@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.BweHold
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.ConservativeInitMode;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.CongestionSignalDetector;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.CongestionSignals;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 

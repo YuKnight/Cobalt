@@ -4,16 +4,17 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainerSpec;
-import com.github.auties00.cobalt.stanza.StanzaBuilder;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerSpec;
+import com.github.auties00.cobalt.stanza.model.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 
@@ -93,7 +94,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     @Override
     AckResult doSend(Jid targetDevice, ChatMessageInfo messageInfo) {
         var container = messageInfo.message();
-        var plaintext = MessageContainerSpec.encode(container);
+        var plaintext = LinkedMessageContainerSpec.encode(container);
 
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "sending peer message {0} to {1}", messageInfo.key().id().orElse(null), targetDevice);
@@ -106,7 +107,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
             emitE2eMessageSendEvent(targetDevice, container, true, payload.type(), 0);
         } catch (RuntimeException encryptionError) {
             if (Log.WARNING) {
-                LOGGER.log(Level.WARNING, "peer message encryption failed for " + Log.jid(targetDevice.toString()), encryptionError);
+                LOGGER.log(Level.WARNING, "peer message encryption failed for " + new LogRedactable.User(targetDevice.toString()), encryptionError);
             }
             emitE2eMessageSendEvent(targetDevice, container, false, null, 0);
             throw encryptionError;

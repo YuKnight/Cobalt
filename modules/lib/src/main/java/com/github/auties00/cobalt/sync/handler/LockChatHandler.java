@@ -5,13 +5,13 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.action.chat.LockChatAction;
-import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
+import com.github.auties00.cobalt.wire.core.jid.Jid;
+import com.github.auties00.cobalt.wire.linked.sync.mutation.MutationApplicationResult;
+import com.github.auties00.cobalt.wire.linked.sync.SyncPatchType;
+import com.github.auties00.cobalt.wire.linked.sync.action.chat.LockChatAction;
+import com.github.auties00.cobalt.wire.linked.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.telemetry.log.Log;
 
 import java.lang.System.Logger.Level;
 
@@ -29,7 +29,7 @@ import java.lang.System.Logger.Level;
  *
  * @implNote
  * This implementation writes the lock state directly on the in-memory
- * {@link com.github.auties00.cobalt.model.chat.Chat}. Because the
+ * {@link com.github.auties00.cobalt.wire.linked.chat.Chat}. Because the
  * {@link LockChatAction#locked()} accessor coalesces a {@code null} protobuf
  * field to {@code false}, a missing flag is treated as an unlock rather than as
  * {@link MutationApplicationResult#malformed()}.
@@ -88,7 +88,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
      * preserved.
      *
      * @implNote
-     * This implementation mutates the {@link com.github.auties00.cobalt.model.chat.Chat}
+     * This implementation mutates the {@link com.github.auties00.cobalt.wire.linked.chat.Chat}
      * in place in a single pass rather than collecting then writing, and maps a
      * failed {@link Jid#of(String)} to {@link MutationApplicationResult#malformed()}.
      */

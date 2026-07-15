@@ -2,14 +2,14 @@ package com.github.auties00.cobalt.message.receive;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.message.MessageInfo;
-import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
-import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.linked.newsletter.NewsletterMessageInfo;
+import com.github.auties00.cobalt.stanza.model.Stanza;
 
 /**
  * Single entry point for every inbound {@code <message>} stanza, turning each one into the
- * typed {@link MessageInfo} that matches the stanza's address class.
+ * typed {@link LinkedMessageInfo} that matches the stanza's address class.
  *
  * <p>Channels posts (a {@code from} JID on the {@code @newsletter} server) become a
  * {@link NewsletterMessageInfo} read straight from the {@code <plaintext>} child; every other
@@ -26,7 +26,7 @@ import com.github.auties00.cobalt.stanza.Stanza;
 public interface MessageReceivingService {
     /**
      * Routes and processes an incoming {@code <message>} stanza into the appropriate
-     * {@link MessageInfo} subtype.
+     * {@link LinkedMessageInfo} subtype.
      *
      * <p>Returns a {@link NewsletterMessageInfo} for Channels posts and a
      * {@link ChatMessageInfo} for every other message class. Returns {@code null} for
@@ -44,7 +44,7 @@ public interface MessageReceivingService {
      * @throws WhatsAppMessageException.Receive if decryption or validation fails for
      *                                          an E2E message
      */
-    MessageInfo process(Stanza stanza);
+    LinkedMessageInfo process(Stanza stanza);
 
     /**
      * Clears the pending-message dedup cache.

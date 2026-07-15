@@ -12,7 +12,7 @@ package com.github.auties00.cobalt.wam;
  * heartbeat. The production implementation is {@link LiveDailyStatsService}.
  *
  * @see LiveDailyStatsService
- * @see com.github.auties00.cobalt.wam.event.DailyEvent
+ * @see com.github.auties00.cobalt.wire.wam.event.DailyEvent
  */
 public interface DailyStatsService {
     /**
