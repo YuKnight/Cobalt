@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Regenerates Java FFM bindings for the FFmpeg subset the toolkit uses (package
-# media.ffmpeg). One umbrella header (ffmpeg_umbrella.h) drives a single jextract
+# util.ffmpeg). One umbrella header (ffmpeg_umbrella.h) drives a single jextract
 # pass so cross-library type dependencies resolve in one compilation unit;
 # per-library invocations fail when a struct field's type is not in the include
 # set. Re-run whenever the FFmpeg headers under headers/ change.
@@ -27,7 +27,7 @@ if [[ "$JEXTRACT" != *.bat ]] && [ ! -x "$JEXTRACT" ] && [ -x "${JEXTRACT}.bat" 
 fi
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.media.ffmpeg"
+PKG="com.github.auties00.cobalt.util.ffmpeg"
 PKG_DIR="$OUT/${PKG//.//}"
 mkdir -p "$PKG_DIR"
 

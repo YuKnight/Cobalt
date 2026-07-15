@@ -2,7 +2,7 @@
  * cobalt_h264_shim.h
  *
  * Portable extern-C facade over openh264 (cisco/openh264 v2.4.1, H.264/AVC
- * encode and decode) for the Cobalt calls2 video stack. It re-exposes only the
+ * encode and decode) for the Cobalt calls video stack. It re-exposes only the
  * openh264 surface the codec uses, through PORTABLE SCALAR TYPES ONLY (the
  * fixed-width <stdint.h> integers, size_t, and opaque void*), so the
  * jextract-generated Java binding is identical on every host ABI.
@@ -69,7 +69,7 @@ extern "C" {
  *   0 = camera video, real-time communication (openh264 CAMERA_VIDEO_REAL_TIME)
  *   1 = screen content, real-time         (openh264 SCREEN_CONTENT_REAL_TIME)
  *
- * The calls2 codec always opens with the camera real-time usage type.
+ * The calls codec always opens with the camera real-time usage type.
  */
 #define COBALT_H264_USAGE_CAMERA_REALTIME 0
 #define COBALT_H264_USAGE_SCREEN_REALTIME 1
@@ -84,7 +84,7 @@ extern "C" {
  *   3 = timestamp mode    (openh264 RC_TIMESTAMP_MODE)
  *  -1 = rate control off  (openh264 RC_OFF_MODE)
  *
- * The calls2 codec always opens in bitrate mode.
+ * The calls codec always opens in bitrate mode.
  */
 #define COBALT_H264_RC_QUALITY     0
 #define COBALT_H264_RC_BITRATE     1
@@ -151,7 +151,7 @@ const char *cobalt_h264_version(void);
  * long-term-reference toggle, mirroring the dimensions, frame rate and bitrates
  * onto spatial layer 0 as openh264 requires alongside the top-level fields),
  * then calls InitializeExt. The color format is fixed to I420, which is the only
- * format the calls2 encode path feeds. The created encoder is returned through
+ * format the calls encode path feeds. The created encoder is returned through
  * outCtx as an opaque handle.
  *
  * @param width             the picture width in pixels.
@@ -311,7 +311,7 @@ int32_t cobalt_h264_encoder_destroy(void *ctx);
  * Creates an openh264 decoder, initializing it with default decoding parameters.
  *
  * The wrapper calls WelsCreateDecoder, zero-initializes a C-side SDecodingParam
- * (the default decode-only configuration the calls2 path uses), and drives the
+ * (the default decode-only configuration the calls path uses), and drives the
  * decoder vtable Initialize slot with it. The created decoder is returned through
  * outCtx as an opaque handle.
  *

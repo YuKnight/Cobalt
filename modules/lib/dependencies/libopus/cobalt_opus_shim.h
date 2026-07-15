@@ -2,7 +2,7 @@
  * cobalt_opus_shim.h
  *
  * Portable extern-C facade over libopus (xiph/opus v1.5.2, the interactive
- * speech and audio codec) for the Cobalt calls2 audio stack. It re-exposes only
+ * speech and audio codec) for the Cobalt calls audio stack. It re-exposes only
  * the libopus surface the call path uses, through PORTABLE SCALAR TYPES ONLY
  * (the fixed-width <stdint.h> integers and opaque void*), so the
  * jextract-generated Java binding is identical on every host ABI.

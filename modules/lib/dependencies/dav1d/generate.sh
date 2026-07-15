@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Regenerates Java FFM bindings for dav1d (AV1 DECODE only; calls2 video stack,
-# package calls2.media.video.av1.bindings). dav1d has no encoder; the AV1 encoder
+# Regenerates Java FFM bindings for dav1d (AV1 DECODE only; calls video stack,
+# package calls.media.video.codec.av1.bindings). dav1d has no encoder; the AV1 encoder
 # (libaom or SVT-AV1) is a SEPARATE FUTURE DEPENDENCY with its own dir, not an
 # extension of this scaffolding.
 #
 # The bound surface is the PORTABLE extern-C shim cobalt_dav1d_shim.h, NOT the
-# raw dav1d.h. The shim re-exposes only the dav1d decode functions the calls2
+# raw dav1d.h. The shim re-exposes only the dav1d decode functions the calls
 # video stack uses, through fixed-width scalars and opaque void* handles, and
 # builds every dav1d struct (Dav1dSettings / Dav1dData / Dav1dPicture and their
 # dependency structs) C-side. jextract therefore emits a binding with no
@@ -49,7 +49,7 @@ fi
 [ -n "$JEXTRACT" ] && [ -f "$JEXTRACT" ] || { echo "jextract not found; set JEXTRACT_HOME or add to PATH" >&2; exit 1; }
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.calls2.media.video.av1.bindings"
+PKG="com.github.auties00.cobalt.calls.media.video.codec.av1.bindings"
 
 # Remove the prior shim binding and any leftover raw-struct binding from before
 # the portable-shim migration, so a regen leaves only the freshly emitted set.

@@ -4,7 +4,7 @@
  * Portable extern-C facade over the WebRTC Audio Processing Module (the
  * webrtc-audio-processing standalone library: AEC3, the WebRTC noise suppressor
  * including its ML denoiser, and the WebRTC gain controller) for the Cobalt
- * calls2 audio-processing stack. It re-exposes only the APM surface the live
+ * calls audio-processing stack. It re-exposes only the APM surface the live
  * capture path uses, through PORTABLE SCALAR TYPES ONLY (the fixed-width
  * <stdint.h> integers, float, and an opaque void* handle), so the
  * jextract-generated Java binding is identical on every host ABI.

@@ -1,6 +1,6 @@
 // Regenerates the VoipParamKey catalogue (the sealed VoipParamKey interface, its
 // VoipParamKeyCatalogue holder, and the per-namespace partition enums) under
-// modules/lib/.../calls2/common directly from the wa-voip WASM module.
+// modules/lib/.../calls/config/param directly from the wa-voip WASM module.
 //
 // This script is self-contained: its only input is the WASM binary. It parses the module
 // itself (code + data sections), decodes the native reg_param_entry_impl descriptor-building
@@ -23,7 +23,7 @@
 const fs = require('fs');
 
 const wasmPath = process.argv[2] || '.temp/voip-param/O4cDmmXP6rI.wasm';
-const outDir = 'modules/lib/src/main/java/com/github/auties00/cobalt/calls2/common';
+const outDir = 'modules/lib/src/main/java/com/github/auties00/cobalt/calls/config/param';
 const CHUNK_SIZE = 700;
 
 // ---------------------------------------------------------------------------------------------
@@ -842,7 +842,7 @@ function generate(entries, collisionEntries) {
   for (const reserved of ['BY_WIRE_PATH']) seenConstants.add(reserved);
 
   const out = [];
-  out.push('package com.github.auties00.cobalt.calls2.common;');
+  out.push('package com.github.auties00.cobalt.calls.config.param;');
   out.push('');
   out.push('import java.lang.reflect.Modifier;');
   out.push('import java.util.Collection;');

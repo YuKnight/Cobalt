@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Regenerates Java FFM bindings for libvpx (calls2 video stack, package
-# calls2.media.video.vpx.bindings).
+# Regenerates Java FFM bindings for libvpx (calls video stack, package
+# calls.media.video.codec.vpx.bindings).
 #
 # The bound surface is the PORTABLE extern-C shim cobalt_vpx_shim.h, NOT the raw
 # libvpx headers. The shim re-exposes only the VP8/VP9 encode and decode surface
-# the calls2 codec uses, through fixed-width scalars and opaque void* handles, and
+# the calls codec uses, through fixed-width scalars and opaque void* handles, and
 # builds every libvpx struct (vpx_codec_ctx_t / vpx_codec_enc_cfg_t /
 # vpx_codec_dec_cfg_t / vpx_image_t / vpx_codec_cx_pkt_t) C-side. jextract
 # therefore emits a binding with no ABI-sensitive layout (no OfLong vs OfInt for
@@ -41,7 +41,7 @@ fi
 [ -n "$JEXTRACT" ] && [ -f "$JEXTRACT" ] || { echo "jextract not found; set JEXTRACT_HOME or add to PATH" >&2; exit 1; }
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.calls2.media.video.vpx.bindings"
+PKG="com.github.auties00.cobalt.calls.media.video.codec.vpx.bindings"
 
 # Remove the prior shim binding and any leftover raw-struct binding from before
 # the portable-shim migration, so a regen leaves only the freshly emitted set.

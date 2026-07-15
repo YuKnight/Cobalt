@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Regenerates Java FFM bindings for openh264 (package
-# calls2.media.video.h264.bindings).
+# calls.media.video.codec.h264.bindings).
 #
 # The bound surface is the PORTABLE extern-C shim cobalt_h264_shim.h, NOT the raw
 # codec_api.h. openh264's runtime API is C++ (the ISVCEncoderVtbl / ISVCDecoderVtbl
@@ -44,7 +44,7 @@ fi
 [ -n "$JEXTRACT" ] && [ -f "$JEXTRACT" ] || { echo "jextract not found; set JEXTRACT_HOME or add to PATH" >&2; exit 1; }
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.calls2.media.video.h264.bindings"
+PKG="com.github.auties00.cobalt.calls.media.video.codec.h264.bindings"
 
 # Remove the prior shim binding and the entire raw-struct/vtable binding emitted
 # before the portable-shim migration, so a regen leaves only the freshly emitted

@@ -2,7 +2,7 @@
  * cobalt_rav1e_shim.h
  *
  * Portable extern-C facade over rav1e (the Rust AV1 ENCODER, exposed through its
- * cargo-c generated C API rav1e.h) for the Cobalt calls2 video stack. It
+ * cargo-c generated C API rav1e.h) for the Cobalt calls video stack. It
  * re-exposes only the rav1e surface the AV1 encoder uses, through PORTABLE
  * SCALAR TYPES ONLY (the fixed-width <stdint.h> integers, size_t, and opaque
  * void*), so the jextract-generated Java binding is identical on every host ABI.

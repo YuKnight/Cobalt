@@ -2,7 +2,7 @@
  * cobalt_dav1d_shim.h
  *
  * Portable extern-C facade over dav1d (VideoLAN dav1d v1.4.3, AV1 DECODE only)
- * for the Cobalt calls2 video stack. It re-exposes only the dav1d surface the
+ * for the Cobalt calls video stack. It re-exposes only the dav1d surface the
  * decoder uses, through PORTABLE SCALAR TYPES ONLY (the fixed-width <stdint.h>
  * integers, size_t, and opaque void*), so the jextract-generated Java binding
  * is identical on every host ABI.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # Regenerates the Java FFM binding for the WebRTC Audio Processing Module shim
-# (calls2 media.audio.processing stack, class
-# com.github.auties00.cobalt.calls2.media.audio.processing.bindings.CobaltWebRtcApm).
+# (calls media.audio.processing stack, class
+# com.github.auties00.cobalt.calls.media.audio.processing.bindings.CobaltWebRtcApm).
 #
 # The bound surface is the PORTABLE extern-C shim cobalt_webrtc_apm_shim.h, NOT
 # the raw WebRTC AudioProcessing C++ API. The shim re-exposes the APM entry
@@ -22,7 +22,7 @@
 # PATH. Download from https://jdk.java.net/jextract/ if absent.
 #
 # NOTE: This binding is currently committed by hand in the same shape jextract
-# emits (see the other calls2 bindings, e.g. ExecuTorch) because the native
+# emits (see the other calls bindings, e.g. CobaltOpus) because the native
 # webrtc-audio-processing library and the cobalt_webrtc_apm_shim.cpp
 # implementation are not yet present in the tree; the WebRtcAudioProcessor seam
 # gates the live-capture conditioner on symbol availability and stays bypassed
@@ -42,7 +42,7 @@ fi
 [ -n "$JEXTRACT" ] && [ -f "$JEXTRACT" ] || { echo "jextract not found; set JEXTRACT_HOME or add to PATH" >&2; exit 1; }
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.calls2.media.audio.processing.bindings"
+PKG="com.github.auties00.cobalt.calls.media.audio.processing.bindings"
 
 PKG_DIR="$OUT/${PKG//.//}"
 rm -f "$PKG_DIR/CobaltWebRtcApm.java" "$PKG_DIR/CobaltWebRtcApm\$shared.java"

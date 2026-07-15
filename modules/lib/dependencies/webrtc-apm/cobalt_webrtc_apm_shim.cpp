@@ -11,7 +11,7 @@
  *
  * Scope: this shim wires only the echo canceller (AEC3, or the mobile AEC) and
  * the noise suppressor. The gain controller is created only when agc_enabled is
- * non-zero; with it left off (the calls2 "AEC + NC" configuration) the AGC code
+ * non-zero; with it left off (the calls "AEC + NC" configuration) the AGC code
  * is never referenced and is dead-stripped from the combined cobalt-native
  * library by the final link's -Wl,--gc-sections, so no AGC module ships.
  *
@@ -82,7 +82,7 @@ extern "C" void *cobalt_webrtc_apm_create(int32_t aec_mode,
     config.noise_suppression.level =
             ns_level(ns_use_denoiser != 0 ? ns_denoiser_intensity : 0.50f);
 
-    // AGC is off in the calls2 AEC+NC configuration; enabling it is opt-in.
+    // AGC is off in the calls AEC+NC configuration; enabling it is opt-in.
     config.gain_controller1.enabled = agc_enabled != 0;
     config.gain_controller2.enabled = false;
 

@@ -2,7 +2,7 @@
  * cobalt_vpx_shim.h
  *
  * Portable extern-C facade over libvpx (webmproject/libvpx v1.15.1, VP8 and VP9
- * encode and decode) for the Cobalt calls2 video stack. It re-exposes only the
+ * encode and decode) for the Cobalt calls video stack. It re-exposes only the
  * libvpx surface the codec uses, through PORTABLE SCALAR TYPES ONLY (the
  * fixed-width <stdint.h> integers, size_t, and opaque void*), so the
  * jextract-generated Java binding is identical on every host ABI.

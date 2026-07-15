@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Regenerates Java FFM bindings for libopus (calls2 audio stack, package
-# calls2.media.audio.opus.bindings).
+# Regenerates Java FFM bindings for libopus (calls audio stack, package
+# calls.media.audio.codec.opus.bindings).
 #
 # The bound surface is the PORTABLE extern-C shim cobalt_opus_shim.h, NOT the raw
 # opus headers. The shim re-exposes only the encode/decode, control, repacketizer
-# and packet-inspection surface the calls2 audio path uses, through fixed-width
+# and packet-inspection surface the calls audio path uses, through fixed-width
 # scalars and opaque void* handles, and turns the VARIADIC opus_encoder_ctl /
 # opus_decoder_ctl(st, request, ...) controls into typed cobalt_opus_* setters and
 # getters applied C-side. It also converts opus_packet_parse's array-of-pointers
@@ -42,7 +42,7 @@ fi
 [ -n "$JEXTRACT" ] && [ -f "$JEXTRACT" ] || { echo "jextract not found; set JEXTRACT_HOME or add to PATH" >&2; exit 1; }
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.calls2.media.audio.opus.bindings"
+PKG="com.github.auties00.cobalt.calls.media.audio.codec.opus.bindings"
 
 # Remove the prior shim binding and the leftover raw binding from before the
 # portable-shim migration, so a regen leaves only the freshly emitted set.
