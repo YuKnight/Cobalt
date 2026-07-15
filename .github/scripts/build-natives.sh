@@ -90,7 +90,7 @@ EXTRA_CFLAGS="$SECTIONS_CFLAGS $MINGW_CFLAGS"
 CODEC_EXTRA_CFLAGS="$CODEC_CFLAGS $MINGW_CFLAGS"
 # opus, libvpx, dav1d, libwebp (pure-C codecs): no unwind tables.
 C_CODEC_EXTRA_CFLAGS="$CODEC_CFLAGS $C_ONLY_CFLAGS $MINGW_CFLAGS"
-# FFmpeg: no explicit -O so its --enable-small (-Os) wins; no unwind tables.
+# FFmpeg: -O2 is set via --optflags at configure (not here); no unwind tables.
 FFMPEG_EXTRA_CFLAGS="-DNDEBUG -ffunction-sections -fdata-sections -fPIC $C_ONLY_CFLAGS $MINGW_CFLAGS"
 
 # openh264 is C++; advertise the matching C++ runtime in pkg-config shims.
@@ -160,7 +160,7 @@ vendor_headers() {
 }
 
 build_opus() {
-    log "opus (static, -O3)"
+    log "opus (static, -O2)"
     ensure_src OPUS_SRC "$OPUS_REPO" "$OPUS_REF" opus
     [ -x "$OPUS_SRC/configure" ] || ( cd "$OPUS_SRC" && autoreconf -isf )
     local b="$BUILD/build-opus"
@@ -193,7 +193,7 @@ build_opus() {
 
 # Keep libopenh264.a intact; the final shared-library link strips unused code.
 build_openh264() {
-    log "openh264 (static, Release -O3)"
+    log "openh264 (static, Release -O2)"
     ensure_src OPENH264_SRC "$OPENH264_REPO" "$OPENH264_REF" openh264
     local make_os make_arch
     case "$OS" in
@@ -264,7 +264,7 @@ build_libvpx() {
 
 # dav1d provides AV1 decode only.
 build_av1() {
-    log "dav1d / AV1 decode (static, release -O3, 8-bit only)"
+    log "dav1d / AV1 decode (static, -O2, 8-bit only)"
     command -v meson >/dev/null 2>&1 || fail "dav1d needs meson on PATH (pip install meson ninja)"
     command -v ninja >/dev/null 2>&1 || fail "dav1d needs ninja on PATH (pip install meson ninja)"
     ensure_src DAV1D_SRC "$DAV1D_REPO" "$DAV1D_REF" dav1d
@@ -435,7 +435,7 @@ EOF
         --disable-everything --disable-programs \
         --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages \
         --disable-network --enable-static --disable-shared \
-        --enable-pic --enable-lto --enable-small \
+        --enable-pic --enable-lto --optflags=-O2 \
         --disable-iconv \
         --pkg-config-flags=--static \
         --enable-demuxer=mov,matroska,ogg,mp3,wav,flac,mp4,aac,image2,webp_pipe,jpeg_pipe \
@@ -488,7 +488,7 @@ build_webrtc_apm() {
         --default-library=static \
         --buildtype=release \
         -Db_staticpic=true \
-        -Dcpp_args="${CXXFLAGS:-} $SECTIONS_CFLAGS $CXX_HIDDEN_CFLAGS $CXX_LEAN_CFLAGS -include cstdint -include cstddef"
+        -Dcpp_args="${CXXFLAGS:-} -O3 -DNDEBUG -ffunction-sections -fdata-sections -fPIC $CXX_HIDDEN_CFLAGS $CXX_LEAN_CFLAGS -include cstdint -include cstddef"
     if [ "$OS" = windows ]; then
         # abseil's NTDDI_WIN10_NI branch enables WinRT calls undeclared under MinGW.
         local tzsrc
